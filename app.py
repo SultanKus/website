@@ -27,7 +27,6 @@
     },
     {
       "cell_type": "code",
-      "execution_count": null,
       "metadata": {
         "colab": {
           "base_uri": "https://localhost:8080/"
@@ -258,7 +257,6 @@
         "id": "TMfNG_5NWMZc",
         "outputId": "21c3b8a9-bc89-4547-8fa4-ddfcc48674f3"
       },
-      "execution_count": null,
       "outputs": [
         {
           "output_type": "stream",
