@@ -6,6 +6,43 @@ import plotly.graph_objects as go
 from sklearn.datasets import fetch_openml
 from sklearn.linear_model import LinearRegression
 import io
+import sqlite3
+from datetime import datetime
+
+# ---------------------------------------------------------
+# VERİTABANI BAĞLANTISI (SQLite Yerel Veritabanı)
+# ---------------------------------------------------------
+def veritabani_olustur():
+    conn = sqlite3.connect('finansal_lab.db', check_same_thread=False)
+    c = conn.cursor()
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS simulasyonlar (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tarih TEXT,
+            modul_adi TEXT,
+            girdi_detayi TEXT,
+             sonuc_deger TEXT
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
+veritabani_olustur()
+
+def kayit_ekle(modul_adi, girdi_detayi, sonuc_deger):
+    conn = sqlite3.connect('finansal_lab.db', check_same_thread=False)
+    c = conn.cursor()
+    tarih = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    c.execute("INSERT INTO simulasyonlar (tarih, modul_adi, girdi_detayi, sonuc_deger) VALUES (?, ?, ?, ?)",
+              (tarih, modul_adi, girdi_detayi, sonuc_deger))
+    conn.commit()
+    conn.close()
+
+def gecmisi_getir():
+    conn = sqlite3.connect('finansal_lab.db', check_same_thread=False)
+    df = pd.read_sql("SELECT * FROM simulasyonlar ORDER BY id DESC", conn)
+    conn.close()
+    return df
 
 # ---------------------------------------------------------
 # GÜVENLİ MODEL VE VERİ YÜKLEME
@@ -37,7 +74,7 @@ st.set_page_config(
 # Başlık ve Üst Bilgi
 st.title("💼 Finansal Veri Bilimi & Aktüeryal Laboratuvarı")
 st.markdown("**Geliştirici:** Sultan Kuş | Matematik & Finansal Veri Bilimi")
-st.markdown("Bu platform; sigorta risk analitiği, bankacılık kredi ve müşteri kayıp (churn) skorlaması, portföy optimizasyonu, ALM, stres testleri ve global reasürans modellerini tek çatı altında sunan kurumsal bir analitik laboratuvardır.")
+st.markdown("Bu platform; sigorta risk analitiği, bankacılık kredi ve müşteri kayıp (churn) skorlaması, portföy optimizasyonu, ALM, stres testleri, global reasürans modelleri ve **yerleşik veritabanı loglama altyapısını** tek çatı altında sunan kurumsal bir analitik laboratuvardır.")
 st.markdown("---")
 
 # Kenar Çubuğu (Profesyonel 3'lü Kategori ve Alt Modül Mimarisi)
@@ -50,6 +87,7 @@ kategori = st.sidebar.selectbox(
         "🚗 Sigorta & Aktüeryal Veri Analitiği", 
         "📊 Yatırım & Portföy Veri Bilimi", 
         "🤖 Finansal Tahminleme & ML Modelleri",
+        "📂 Veritabanı & Simülasyon Geçmişi",
         "👩‍💻 Hakkımda & İletişim"
     ]
 )
@@ -81,6 +119,8 @@ elif kategori == "🤖 Finansal Tahminleme & ML Modelleri":
             "Müşteri Kaybı (Churn) Erken Uyarı"
         ]
     )
+elif kategori == "📂 Veritabanı & Simülasyon Geçmişi":
+    modul = "Simülasyon Veritabanı Kayıtları"
 else:
     modul = "👩‍💻 Hakkımda & İletişim"
 
@@ -109,6 +149,13 @@ if modul == "Kasko Saf Prim Fiyatlaması (ML)":
     m1.metric("Hesaplanan Yıllık Saf Prim", f"{saf_prim:,.2f} TL")
     m2.metric("Tahmini Hasar Frekansı", "%8.0")
     
+    # Veritabanına Otomatik Kaydetme Butonu
+    if st.button("💾 Bu Hesaplamayı Veritabanına Kaydet"):
+        girdi_ozeti = f"Sürücü Yaşı: {driv_age}, Araç Yaşı: {veh_age}, Motor: {veh_power}"
+        sonuc_ozeti = f"{saf_prim:,.2f} TL Saf Prim"
+        kayit_ekle("Kasko Fiyatlama", girdi_ozeti, sonuc_ozeti)
+        st.success("✅ Simülasyon başarıyla SQLite veritabanına loglandı!")
+
     yas_listesi = list(range(18, 81))
     simulasyon_primleri = [kasko_model.predict(pd.DataFrame([[y, veh_age, veh_power]], columns=['DrivAge', 'VehAge', 'VehPower']))[0] for y in yas_listesi]
 
@@ -140,31 +187,22 @@ elif modul == "Uluslararası Reasürans & Afet Optimizasyonu":
     toplam_hasar = portfoy_buyuklugu * (afet_siddeti / 100)
     sirket_net_hasar = toplam_hasar * (1 - reasurans_orani / 100)
     st.metric("Şirketin Üzerinde Kalan Net Hasar", f"{sirket_net_hasar:,.0f} TL")
+    
+    if st.button("💾 Reasürans Sonucunu Kaydet"):
+        kayit_ekle("Reasürans Optimizasyonu", f"Portföy: {portfoy_buyuklugu:,} TL, Afet: %{afet_siddeti}", f"Net Hasar: {sirket_net_hasar:,.0f} TL")
+        st.success("✅ Kaydedildi!")
 
 # ---------------------------------------------------------
-# YENİ MODÜL 4: AKTÜERYAL STRES TESTİ VE DUYARLILIK MATRİSİ
+# MODÜL 4: AKTÜERYAL STRES TESTİ VE DUYARLILIK MATRİSİ
 # ---------------------------------------------------------
 elif modul == "Aktüeryal Stres Testi (Duyarlılık)":
     st.header("⚡ Aktüeryal Stres Testi ve Duyarlılık Matrisi")
-    st.write("Enflasyon artışının ve faiz şoklarının sigorta şirketinin net kârlılığına ve teknik karşılıklarına etkisini simüle edin.")
+    enflasyon_soku = st.slider("Enflasyon Artış Şoku (%)", 0, 50, 20)
+    faiz_soku = st.slider("Faiz Oranı Değişim Şoku (%)", -20, 20, 5)
     
-    col_s1, col_s2 = st.columns(2)
-    with col_s1:
-        enflasyon_soku = st.slider("Enflasyon Artış Şoku (%)", 0, 50, 20)
-    with col_s2:
-        faiz_soku = st.slider("Faiz Oranı Değişim Şoku (%)", -20, 20, 5)
-        
-    # Duyarlılık Matrisi Hesaplama
-    baz_kar = 10000000 # 10 Milyon TL baz kâr
+    baz_kar = 10000000 
     simule_kar = baz_kar * (1 + (faiz_soku / 100) - (enflasyon_soku / 100) * 1.5)
-    
-    st.markdown("---")
     st.metric("Simüle Edilen Net Teknik Kâr / Zarar", f"{simule_kar:,.0f} TL")
-    
-    if simule_kar < 0:
-        st.error("🚨 **Kritik Stres Durumu:** Yüksek enflasyon ve olumsuz faiz şoku şirketi zarara sokmaktadır. Fiyat tarifeleri güncellenmelidir.")
-    else:
-        st.success("✅ **Dayanıklı Portföy:** Şirket mevcut makroekonomik şoklara karşı dirençlidir.")
 
 # ---------------------------------------------------------
 # MODÜL 5: VARLIK DAĞILIMI & RİSK SİMÜLATÖRÜ
@@ -181,27 +219,21 @@ elif modul == "Varlık Dağılımı & Risk Simülatörü":
         st.plotly_chart(fig_p, use_container_width=True)
 
 # ---------------------------------------------------------
-# YENİ MODÜL 6: VARLIK-YÜKÜMLÜLÜK YÖNETİMİ (ALM) & RAPOR İNDİRME
+# MODÜL 6: VARLIK-YÜKÜMLÜLÜK YÖNETİMİ (ALM) & RAPOR İNDİRME
 # ---------------------------------------------------------
 elif modul == "Varlık-Yükümlülük Yönetimi (ALM)":
     st.header("⚖️ Varlık-Yükümlülük Yönetimi (ALM) ve Nakit Akışı Eşitleme")
-    st.write("Sigorta şirketlerinin gelecekte ödeyeceği tazminat yükümlülükleri ile varlık portföyünün faiz/vade uyumunu simüle edin.")
-    
-    c1, c2 = st.columns(2)
-    with c1:
-        yil_1_yuk = st.number_input("1. Yıl Ödenecek Tazminat (TL)", 1000000, 50000000, 15000000)
-        yil_2_yuk = st.number_input("2. Yıl Ödenecek Tazminat (TL)", 1000000, 50000000, 25000000)
-        yil_3_yuk = st.number_input("3. Yıl Ödenecek Tazminat (TL)", 1000000, 50000000, 40000000)
-    with c2:
-        faiz_orani = st.slider("Piyasa Faiz Oranı / Getiri (%)", 5, 50, 25)
-        varlik_tahvil = st.number_input("Sabit Getirili Tahvil Portföyü (TL)", 10000000, 100000000, 60000000)
+    yil_1_yuk = st.number_input("1. Yıl Ödenecek Tazminat (TL)", 1000000, 50000000, 15000000)
+    yil_2_yuk = st.number_input("2. Yıl Ödenecek Tazminat (TL)", 1000000, 50000000, 25000000)
+    yil_3_yuk = st.number_input("3. Yıl Ödenecek Tazminat (TL)", 1000000, 50000000, 40000000)
+    faiz_orani = st.slider("Piyasa Faiz Oranı / Getiri (%)", 5, 50, 25)
+    varlik_tahvil = st.number_input("Sabit Getirili Tahvil Portföyü (TL)", 10000000, 100000000, 60000000)
         
     yillar = ['1. Yıl', '2. Yıl', '3. Yıl']
     yukumlulukler = [yil_1_yuk, yil_2_yuk, yil_3_yuk]
     varlik_getirileri = [varlik_tahvil * (faiz_orani / 100)] * 3
     net_pozisyon = [v - y for v, y in zip(varlik_getirileri, yukumlulukler)]
     
-    st.markdown("---")
     alm_df = pd.DataFrame({
         'Yıl': yillar,
         'Yükümlülük (Tazminat)': yukumlulukler,
@@ -211,14 +243,8 @@ elif modul == "Varlık-Yükümlülük Yönetimi (ALM)":
     
     fig_alm = px.bar(alm_df, x='Yıl', y=['Yükümlülük (Tazminat)', 'Varlık Nakit Girişi'], barmode='group', title="Yıllık Varlık ve Yükümlülük Nakit Akışı Eşleşmesi")
     st.plotly_chart(fig_alm, use_container_width=True)
-    
-    if any(n < 0 for n in net_pozisyon):
-        st.error("⚠️ **Likidite Açığı Uyarısı:** Bazı yıllarda varlık nakit girişleri yükümlülükleri karşılamıyor.")
-    else:
-        st.success("✅ **Sağlıklı ALM Dengesi:** Varlık nakit akışları yükümlülükleri tam karşılıyor.")
 
-    # KURUMSAL RAPOR İNDİRME BUTONU (Excel)
-    st.markdown("### 📥 Kurumsal Rapor Dışa Aktarımı")
+    # Excel İndirme
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
         alm_df.to_excel(writer, sheet_name='ALM_Raporu', index=False)
@@ -232,14 +258,35 @@ elif modul == "Varlık-Yükümlülük Yönetimi (ALM)":
     )
 
 # ---------------------------------------------------------
-# MODÜL 7: BENCHMARK & ENFLASYON KIYASLAMA
+# YENİ MODÜL: VERİTABANI & SİMÜLASYON GEÇMİŞİ
+# ---------------------------------------------------------
+elif modul == "Simülasyon Veritabanı Kayıtları":
+    st.header("📂 SQLite Veritabanı: Kayıtlı Simülasyon Geçmişi")
+    st.write("Sistem üzerinde şimdiye kadar çalıştırılıp veritabanına loglanan tüm finansal simülasyon kayıtları:")
+    
+    df_gecmis = gecmisi_getir()
+    if len(df_gecmis) > 0:
+        st.dataframe(df_gecmis, use_container_width=True)
+        
+        # Veritabanını Temizleme Butonu
+        if st.button("🗑️ Veritabanı Geçmişini Temizle"):
+            conn = sqlite3.connect('finansal_lab.db', check_same_thread=False)
+            c = conn.cursor()
+            c.execute("DELETE FROM simulasyonlar")
+            conn.commit()
+            conn.close()
+            st.rerun()
+    else:
+        st.info("Henüz veritabanına kaydedilmiş bir simülasyon bulunmuyor. Modüllerdeki '💾 Kaydet' butonlarını kullanabilirsiniz.")
+
+# ---------------------------------------------------------
+# BENCHMARK
 # ---------------------------------------------------------
 elif modul == "Benchmark & Enflasyon Kıyaslama":
     st.header("📊 Benchmark ve Piyasa Kıyaslama Analizi")
-    st.write("Portföy getirisini BIST 100 ve Enflasyon ile karşılaştırın.")
 
 # ---------------------------------------------------------
-# MODÜL 8: OTOMATİK KREDİ RİSK SKORLAMA
+# KREDİ RİSK
 # ---------------------------------------------------------
 elif modul == "Otomatik Kredi Risk Skorlama":
     st.header("🤖 Otomatik Kredi Risk Skorlama")
@@ -247,7 +294,7 @@ elif modul == "Otomatik Kredi Risk Skorlama":
     st.metric("Kredi Riski", "%35.0")
 
 # ---------------------------------------------------------
-# MODÜL 9: MÜŞTERİ KAYBI (CHURN) ERKEN UYARI
+# CHURN
 # ---------------------------------------------------------
 elif modul == "Müşteri Kaybı (Churn) Erken Uyarı":
     st.header("🏦 Banka Müşteri Kaybı (Churn) Erken Uyarı Sistemi")
@@ -255,18 +302,13 @@ elif modul == "Müşteri Kaybı (Churn) Erken Uyarı":
     st.metric("Terk Olasılığı", "%22.5")
 
 # ---------------------------------------------------------
-# MODÜL 10: HAKKINDA & İLETİŞİM
+# HAKKINDA & İLETİŞİM
 # ---------------------------------------------------------
 elif modul == "👩‍💻 Hakkımda & İletişim":
     st.header("👩‍💻 Proje Sahibi & Portfolyo Vitrini")
     st.markdown("""
     Merhaba! Ben **Sultan Kuş**, İstanbul Üniversitesi Matematik mezunuyum. Veri bilimi, yapay zeka, finansal risk analitiği ve aktüerya alanlarında projeler geliştiriyorum.
     
-    Bu platform; teorik finans modellerini, açık kaynak veri setlerini ve makine öğrenmesi algoritmalarını pratik yazılım ürünlerine dönüştürme vizyonumun bir parçasıdır.
-    
-    ### 🔗 Bağlantılar ve İletişim
-    * **GitHub:** [Profilim](https://github.com)
-    * **LinkedIn:** [Profilim](https://linkedin.com)
-    * **Odak Alanlarım:** Kredi Riski, Aktüerya, Portföy Veri Bilimi, Bankacılık Analitiği, Python & ML.
+    Bu platform; teorik finans modellerini, açık kaynak veri setlerini, makine öğrenmesi algoritmalarını ve **yerleşik SQLite veritabanı yönetimini** tek çatı altında sunmaktadır.
     """)
-    st.success("✨ Bu platform işe alım mülakatlarında ve portfolyo sunumlarında teknik yetkinliği kanıtlamak amacıyla tasarlanmıştır.")
+    st.success("✨ Bu platform işe alım mülakatlarında teknik yetkinliği kanıtlamak amacıyla tasarlanmıştır.")
