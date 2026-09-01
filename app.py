@@ -50,12 +50,14 @@ elif modul == "🚗 Aktüeryal Kasko Saf Prim Fiyatlaması":
         veh_gas = st.selectbox("Yakıt Türü", ["Diesel", "Regular"])
         
     # --- İŞTE BURASI KRİTİK KISIM ---
-    # Kullanıcının seçtiği girdileri modelin anlayacağı tablo formatına çeviriyoruz
+    # Kullanıcının slider'dan seçtiği değerleri, gerçek modelin tanıdığı büyük harfli isimlerle paketliyoruz
     girdi_df = pd.DataFrame(
-        [[driv_age, veh_age, veh_power, bonus_malus]], 
-        columns=['driv_age', 'veh_age', 'veh_power', 'bonus_malus']
+        [[driv_age, veh_age, veh_power]], 
+        columns=['DrivAge', 'VehAge', 'VehPower']
     )
     
+    # Model bu tabloyu okuyup gerçek prim sonucunu veriyor
+    saf_prim = kasko_model.predict(girdi_df)[0]
     # Doğrudan GitHub'a yüklediğimiz .pkl modeline tahmin yaptırıyoruz!
     saf_prim = kasko_model.predict(girdi_df)[0]
     tahmin_frekans = 0.08  # Görsel gösterim için sabit oran
