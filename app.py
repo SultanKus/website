@@ -33,7 +33,8 @@ modul = st.sidebar.selectbox(
 # ---------------------------------------------------------
 # Kullanıcının mevcut seçimine göre bir yaş aralığı simülasyonu yaratalım (Örn: 18'den 80 yaşa kadar)
 # Kullanıcının mevcut seçimine göre yaş simülasyonu grafiği
-if modul == "🚗 Aktüeryal Kasko Saf Prim Fiyatlaması":
+
+elif modul == "🚗 Aktüeryal Kasko Saf Prim Fiyatlaması":
     st.header("🚗 Aktüeryal Kasko Saf Prim (Pure Premium) Fiyatlama Motoru")
     st.write("Poisson (Hasar Frekansı) ve Gamma (Hasar Şiddeti) dağılımlarını kullanarak risk bazlı adil kasko primi hesaplayın.")
     
@@ -61,19 +62,33 @@ if modul == "🚗 Aktüeryal Kasko Saf Prim Fiyatlaması":
             st.error("⚠️ **Yüksek Risk Grubu:** Bu profildeki müşteriye ek teminat ve yüksek muafiyet şartı uygulanmalıdır.")
         else:
             st.success("✅ **Düşük/Orta Risk Grubu:** Standart tarife üzerinden poliçelendirme uygundur.")
-            yaslar = list(range(18, 81))
-        simulasyon_primleri = [(0.04 + (y < 25) * 0.12 + (bonus_malus / 1200)) * (4000 + (veh_power * 300) + (bonus_malus * 30)) for y in yaslar]
+
+        # --- DİNAMİK YAŞ RİSKİ GRAFİĞİ ---
+        st.markdown("---")
+        st.subheader("📊 Risk Analizi: Yaş ve Prim Eğrisi")
+        
+        yas_listesi = list(range(18, 81))
+        simulasyon_primleri = [
+            (0.04 + (y < 25) * 0.12 + (bonus_malus / 1200)) * (4000 + (veh_power * 300) + (bonus_malus * 30)) 
+            for y in yas_listesi
+        ]
 
         fig = go.Figure()
-        fig.add_trace(go.Scatter(x=yaslar, y=simulasyon_primleri, mode='lines+markers', name='Yaş Bazlı Prim Eğrisi', line=dict(color='#ff4b4b', width=3)))
+        fig.add_trace(go.Scatter(
+            x=yas_listesi, 
+            y=simulasyon_primleri, 
+            mode='lines+markers', 
+            name='Yaş Bazlı Saf Prim', 
+            line=dict(color='#ff4b4b', width=3)
+        ))
 
         fig.update_layout(
-            title="Sürücü Yaşı ve Saf Prim İlişkisi (Risk Eğrisi)",
+            title="Sürücü Yaşına Göre Saf Prim Değişim Eğrisi",
             xaxis_title="Sürücü Yaşı",
             yaxis_title="Hesaplanan Saf Prim (TL)",
             template="plotly_white"
-)
-st.plotly_chart(fig, use_container_width=True)
+        )
+        st.plotly_chart(fig, use_container_width=True)
 
 
 # ---------------------------------------------------------
