@@ -5,6 +5,11 @@ import plotly.express as px
 import plotly.graph_objects as go
 import joblib
 
+from utils import kasko_modelini_yukle, gercek_kasko_verisini_getir
+
+# Ortak modeli çağırıyoruz
+kasko_model = kasko_modelini_yukle()
+
 # GitHub'daki models klasöründen eğitilmiş modeli yüklüyoruz
 kasko_model = joblib.load('models/kasko_model.pkl')
 
