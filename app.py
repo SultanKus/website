@@ -302,7 +302,6 @@
         "id": "zPZ6f1_HWdxQ",
         "outputId": "e5c2abfb-131c-4c19-ce31-385eea27861d"
       },
-      "execution_count": null,
       "outputs": [
         {
           "output_type": "stream",
