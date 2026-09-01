@@ -4,16 +4,29 @@ import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 import joblib
-from utils import kasko_modelini_yukle, gercek_kasko_verisini_getir
+import os
+from sklearn.datasets import fetch_openml
+from sklearn.linear_model import LinearRegression
 
-# Ortak modeli çağırıyoruz
+# ---------------------------------------------------------
+# GÜVENLİ MODEL VE VERİ YÜKLEME (UTILS MİMARİSİ)
+# ---------------------------------------------------------
+@st.cache_data
+def gercek_kasko_verisini_getir():
+    dataset = fetch_openml(name='freMTPL2freq', version=1, as_frame=True, parser='auto')
+    df = dataset.frame
+    return df[['VehPower', 'VehAge', 'DrivAge', 'ClaimNb', 'Exposure']].dropna()
+
+@st.cache_resource
+def kasko_modelini_yukle():
+    df = gercek_kasko_verisini_getir().head(1000)
+    X = df[['DrivAge', 'VehAge', 'VehPower']]
+    y = df['ClaimNb'] * 12000 + 4000
+    model = LinearRegression()
+    model.fit(X, y)
+    return model
+
 kasko_model = kasko_modelini_yukle()
-
-# GitHub'daki models klasöründen eğitilmiş modeli yüklüyoruz (Yedek güvence)
-try:
-    kasko_model = joblib.load('models/kasko_model.pkl')
-except:
-    pass
 
 # Sayfa Yapılandırması (Geniş Ekran)
 st.set_page_config(
@@ -25,7 +38,7 @@ st.set_page_config(
 # Stil ve Başlık Düzenlemesi
 st.title("💼 Finansal Veri Bilimi & Aktüeryal Laboratuvarı")
 st.markdown("**Geliştirici:** Sultan Kuş | Matematik & Finansal Veri Bilimi")
-st.markdown("Bu platform; sigorta risk analitiği, bankacılık kredi ve müşteri kayıp (churn) skorlaması, portföy optimizasyonu ve makine öğrenmesi tabanlı finansal tahminleme modellerini tek çatı altında sunan kurumsal bir analitik laboratuvardır.")
+st.markdown("Bu platform; sigorta risk analitiği, bankacılık kredi ve müşteri kayıp (churn) skorlaması, portföy optimizasyonu ve global reasürans modellerini tek çatı altında sunan kurumsal bir analitik laboratuvardır.")
 st.markdown("---")
 
 # Kenar Çubuğu (Profesyonel 3'lü Kategori ve Alt Modül Mimarisi)
@@ -47,7 +60,8 @@ if kategori == "🚗 Sigorta & Aktüeryal Veri Analitiği":
         "Alt Modüller", 
         [
             "Kasko Saf Prim Fiyatlaması (ML)", 
-            "Hasar Frekans & Risk Profili"
+            "Hasar Frekans & Risk Profili",
+            "Uluslararası Reasürans & Afet Optimizasyonu"
         ]
     )
 elif kategori == "📊 Yatırım & Portföy Veri Bilimi":
@@ -86,14 +100,13 @@ if modul == "Kasko Saf Prim Fiyatlaması (ML)":
         veh_brand = st.selectbox("Araç Markası", ["Renault", "Volkswagen", "Peugeot", "BMW", "Citroen"])
         veh_gas = st.selectbox("Yakıt Türü", ["Diesel", "Regular"])
         
-    # Kullanıcının girdilerini gerçek modelin tanıdığı büyük harfli kolon isimleriyle paketliyoruz
     girdi_df = pd.DataFrame(
         [[driv_age, veh_age, veh_power]], 
         columns=['DrivAge', 'VehAge', 'VehPower']
     )
     
     saf_prim = kasko_model.predict(girdi_df)[0]
-    tahmin_frekans = 0.08  # Görsel gösterim oranı
+    tahmin_frekans = 0.08  
     
     st.markdown("---")
     m1, m2 = st.columns(2)
@@ -105,7 +118,6 @@ if modul == "Kasko Saf Prim Fiyatlaması (ML)":
     else:
         st.success("✅ **Düşük/Orta Risk Grubu:** Standart tarife üzerinden poliçelendirme uygundur.")
 
-    # Dinamik Yaş & Prim Grafiği
     st.markdown("---")
     st.subheader("📊 Risk Analizi: Sürücü Yaşı ve Prim Değişim Eğrisi")
     
@@ -152,6 +164,58 @@ elif modul == "Hasar Frekans & Risk Profili":
     fig_hasar = px.line(yas_hasar, x='DrivAge', y='ClaimNb', title="Yaş Bazlı Ortalama Hasar Frekansı", markers=True)
     fig_hasar.update_layout(template="plotly_white", xaxis_title="Sürücü Yaşı", yaxis_title="Ortalama Hasar Sayısı")
     st.plotly_chart(fig_hasar, use_container_width=True)
+
+# ---------------------------------------------------------
+# YENİ MODÜL: ULUSLARARASI REASÜRANS & AFET OPTİMİZASYONU
+# ---------------------------------------------------------
+elif modul == "Uluslararası Reasürans & Afet Optimizasyonu":
+    st.header("🌐 Uluslararası Reasürans ve Afet Riski Optimizasyon Modeli")
+    st.write("Büyük ölçekli afet senaryolarında (örn. Deprem), sigorta şirketinin bilançosunu korumak için uyguladığı reasürans (risk transferi) maliyet ve optimizasyon simülasyonu.")
+    
+    col_r1, col_r2 = st.columns(2)
+    with col_r1:
+        portfoy_buyuklugu = st.number_input("Toplam Portföy Teminat Büyüklüğü (TL)", 10000000, 1000000000, 150000000, step=10000000)
+        afet_siddeti = st.slider("Beklenen Afet Şiddet Senaryosu (Hasar Oranı %)", 5, 50, 20)
+    with col_r2:
+        reasurans_retorasyon_orani = st.slider("Reasüröre Devredilen Risk Oranı (%)", 10, 90, 60)
+        reasurans_komisyonu = st.slider("Reasürör Kesinti / Maliyet Oranı (%)", 2, 15, 6)
+        
+    # Finansal ve Aktüeryal Simülasyon Hesaplamaları
+    toplam_hasar_tutari = portfoy_buyuklugu * (afet_siddeti / 100)
+    sirketin_ustlendigi_hasar = toplam_hasar_tutari * (1 - reasurans_retorasyon_orani / 100)
+    reasurore_devredilen_risk = toplam_hasar_tutari * (reasurans_retorasyon_orani / 100)
+    reasurans_maliyeti = reasurore_devredilen_risk * (reasurans_komisyonu / 100)
+    
+    toplam_maliyet = sirketin_ustlendigi_hasar + reasurans_maliyeti
+    
+    st.markdown("---")
+    r_m1, r_m2, r_m3 = st.columns(3)
+    r_m1.metric("Simüle Edilen Toplam Hasar", f"{toplam_hasar_tutari:,.0f} TL")
+    r_m2.metric("Şirketin Üzerinde Kalan Hasar", f"{sirketin_ustlendigi_hasar:,.0f} TL")
+    r_m3.metric("Reasürans Maliyeti (Primi)", f"{reasurans_maliyeti:,.0f} TL")
+    
+    if sirketin_ustlendigi_hasar > 40000000:
+        st.error("🚨 **Bilanço Riski Yüksek:** Şirketin üstlendiği net hasar özkaynakları zorlayabilir. Reasürans oranı artırılmalıdır.")
+    else:
+        st.success("✅ **Optimal Risk Transferi:** Bilanço yapısı uluslararası IFRS 17 risk kriterlerine uygundur.")
+        
+    # Reasürans Karşılaştırma Grafiği
+    reasurans_df = pd.DataFrame({
+        'Finansal Kalem': ['Şirket Net Hasar Yükü', 'Reasürör Ödemesi', 'Reasürans Maliyeti'],
+        'Tutar (TL)': [sirketin_ustlendigi_hasar, reasurore_devredilen_risk, reasurans_maliyeti]
+    })
+    
+    fig_re = px.bar(
+        reasurans_df, 
+        x='Finansal Kalem', 
+        y='Tutar (TL)',
+        text='Tutar (TL)',
+        color='Finansal Kalem',
+        title="Afet Senaryosu Bilanço Dağılımı ve Risk Transferi"
+    )
+    fig_re.update_traces(texttemplate='%{text:,.0f} TL', textposition='outside')
+    fig_re.update_layout(template="plotly_white", showlegend=False)
+    st.plotly_chart(fig_re, use_container_width=True)
 
 # ---------------------------------------------------------
 # MODÜL 3: VARLIK DAĞILIMI & RİSK SİMÜLATÖRÜ
