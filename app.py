@@ -10,63 +10,91 @@ from utils import kasko_modelini_yukle, gercek_kasko_verisini_getir
 # Ortak modeli çağırıyoruz
 kasko_model = kasko_modelini_yukle()
 
-# GitHub'daki models klasöründen eğitilmiş modeli yüklüyoruz
-kasko_model = joblib.load('models/kasko_model.pkl')
+# GitHub'daki models klasöründen eğitilmiş modeli yüklüyoruz (Yedek güvence)
+try:
+    kasko_model = joblib.load('models/kasko_model.pkl')
+except:
+    pass
 
 # Sayfa Yapılandırması (Geniş Ekran)
 st.set_page_config(
-    page_title="Sultan Kuş | Finansal Risk & Aktüerya Platformu", 
+    page_title="Sultan Kuş | Finansal Veri Bilimi & Aktüeryal Lab", 
     page_icon="💼", 
     layout="wide"
 )
 
 # Stil ve Başlık Düzenlemesi
-st.title("💼 Bütünleşik Finansal Risk, Aktüerya ve Portföy Analitiği Platformu")
+st.title("💼 Finansal Veri Bilimi & Aktüeryal Laboratuvarı")
 st.markdown("**Geliştirici:** Sultan Kuş | Matematik & Finansal Veri Bilimi")
-st.markdown("Bu platform; bankacılık kredi riski, aktüeryal kasko fiyatlaması, müşteri terk (churn) erken uyarı sistemleri ve portföy risk analizlerini tek bir çatı altında sunan interaktif bir karar destek sistemidir.")
+st.markdown("Bu platform; sigorta risk analitiği, bankacılık kredi ve müşteri kayıp (churn) skorlaması, portföy optimizasyonu ve makine öğrenmesi tabanlı finansal tahminleme modellerini tek çatı altında sunan kurumsal bir analitik laboratuvardır.")
 st.markdown("---")
 
-# Sol Menü (Modül Seçimi)
-modul = st.sidebar.selectbox(
-    "Analitik Modül Seçin", 
+# Kenar Çubuğu (Profesyonel 3'lü Kategori ve Alt Modül Mimarisi)
+st.sidebar.title("🚀 Analitik Laboratuvarı")
+st.sidebar.markdown("---")
+
+kategori = st.sidebar.selectbox(
+    "Ana Kategori", 
     [
-        "🚗 Aktüeryal Kasko Saf Prim Fiyatlaması", 
-        "🏦 Müşteri Kaybı (Churn) Erken Uyarı", 
-        "📈 Varlık & Portföy Risk Analizi",
+        "🚗 Sigorta & Aktüeryal Veri Analitiği", 
+        "📊 Yatırım & Portföy Veri Bilimi", 
+        "🤖 Finansal Tahminleme & ML Modelleri",
         "👩‍💻 Hakkımda & İletişim"
     ]
 )
 
+if kategori == "🚗 Sigorta & Aktüeryal Veri Analitiği":
+    modul = st.sidebar.radio(
+        "Alt Modüller", 
+        [
+            "Kasko Saf Prim Fiyatlaması (ML)", 
+            "Hasar Frekans & Risk Profili"
+        ]
+    )
+elif kategori == "📊 Yatırım & Portföy Veri Bilimi":
+    modul = st.sidebar.radio(
+        "Alt Modüller", 
+        [
+            "Varlık Dağılımı & Risk Simülatörü", 
+            "Benchmark & Enflasyon Kıyaslama"
+        ]
+    )
+elif kategori == "🤖 Finansal Tahminleme & ML Modelleri":
+    modul = st.sidebar.radio(
+        "Alt Modüller", 
+        [
+            "Otomatik Kredi Risk Skorlama", 
+            "Müşteri Kaybı (Churn) Erken Uyarı"
+        ]
+    )
+else:
+    modul = "👩‍💻 Hakkımda & İletişim"
+
 # ---------------------------------------------------------
-# MODÜL 1: AKTÜERYAL KASKO SAF PRİM FİYATLAMASI
+# MODÜL 1: KASKO SAF PRİM FİYATLAMASI (ML)
 # ---------------------------------------------------------
-elif modul == "🚗 Aktüeryal Kasko Saf Prim Fiyatlaması":
+if modul == "Kasko Saf Prim Fiyatlaması (ML)":
     st.header("🚗 Aktüeryal Kasko Saf Prim (Pure Premium) Fiyatlama Motoru")
-    st.write("Eğitilmiş Makine Öğrenmesi Modeli ile risk bazlı adil kasko primi hesaplayın.")
+    st.write("Açık kaynak gerçek sigorta veri setiyle eğitilmiş Makine Öğrenmesi Modeli üzerinden risk bazlı adil kasko primi hesaplayın.")
     
     col1, col2 = st.columns(2)
     with col1:
-        driv_age = st.slider("Sürücü Yaşı", 18, 90, 28)
-        veh_age = st.slider("Araç Yaşı", 0, 20, 3)
-        veh_power = st.slider("Araç Motor Gücü (Power)", 1, 15, 7)
+        driv_age = st.slider("Sürücü Yaşı (DrivAge)", 18, 90, 28)
+        veh_age = st.slider("Araç Yaşı (VehAge)", 0, 20, 3)
+        veh_power = st.slider("Araç Motor Gücü (VehPower)", 1, 15, 7)
     with col2:
         bonus_malus = st.slider("Bonus-Malus (Hasarsızlık Puanı)", 50, 250, 100)
         veh_brand = st.selectbox("Araç Markası", ["Renault", "Volkswagen", "Peugeot", "BMW", "Citroen"])
         veh_gas = st.selectbox("Yakıt Türü", ["Diesel", "Regular"])
         
-    # --- İŞTE BURASI KRİTİK KISIM ---
-    # Kullanıcının slider'dan seçtiği değerleri, gerçek modelin tanıdığı büyük harfli isimlerle paketliyoruz
+    # Kullanıcının girdilerini gerçek modelin tanıdığı büyük harfli kolon isimleriyle paketliyoruz
     girdi_df = pd.DataFrame(
         [[driv_age, veh_age, veh_power]], 
         columns=['DrivAge', 'VehAge', 'VehPower']
     )
     
-    # Model bu tabloyu okuyup gerçek prim sonucunu veriyor
     saf_prim = kasko_model.predict(girdi_df)[0]
-    # Doğrudan GitHub'a yüklediğimiz .pkl modeline tahmin yaptırıyoruz!
-    saf_prim = kasko_model.predict(girdi_df)[0]
-    tahmin_frekans = 0.08  # Görsel gösterim için sabit oran
-    # -------------------------------
+    tahmin_frekans = 0.08  # Görsel gösterim oranı
     
     st.markdown("---")
     m1, m2 = st.columns(2)
@@ -83,9 +111,8 @@ elif modul == "🚗 Aktüeryal Kasko Saf Prim Fiyatlaması":
     st.subheader("📊 Risk Analizi: Sürücü Yaşı ve Prim Değişim Eğrisi")
     
     yas_listesi = list(range(18, 81))
-    # Grafikte de artık statik formül yerine modelin .predict() metodunu kullanıyoruz
     simulasyon_primleri = [
-        kasko_model.predict(pd.DataFrame([[y, veh_age, veh_power, bonus_malus]], columns=['driv_age', 'veh_age', 'veh_power', 'bonus_malus']))[0] 
+        kasko_model.predict(pd.DataFrame([[y, veh_age, veh_power]], columns=['DrivAge', 'VehAge', 'VehPower']))[0] 
         for y in yas_listesi
     ]
 
@@ -105,62 +132,32 @@ elif modul == "🚗 Aktüeryal Kasko Saf Prim Fiyatlaması":
     st.plotly_chart(fig, use_container_width=True)
 
 # ---------------------------------------------------------
-# MODÜL 2: MÜŞTERİ KAYBI (CHURN) ERKEN UYARI
+# MODÜL 2: HASAR FREKANS & RİSK PROFİLİ
 # ---------------------------------------------------------
-elif modul == "🏦 Müşteri Kaybı (Churn) Erken Uyarı":
-    st.header("🏦 Banka Müşteri Kaybı (Churn) Erken Uyarı Sistemi")
-    st.write("Makine öğrenmesi altyapısıyla bankayı terk etme potansiyeli taşıyan müşterileri önceden tespit edin.")
+elif modul == "Hasar Frekans & Risk Profili":
+    st.header("📈 Hasar Frekans & Aktüeryal Portföy Dağılımı")
+    st.write("Gerçek sigorta veri seti (`freMTPL2freq`) üzerinden portföyün genel risk dağılımını inceleyin.")
     
-    c1, c2 = st.columns(2)
-    with c1:
-        credit_score = st.slider("Kredi Skoru", 350, 850, 650)
-        age = st.slider("Müşteri Yaşı", 18, 80, 38)
-        balance = st.number_input("Vadesiz / Vadeli Hesap Bakiyesi (TL)", 0.0, 500000.0, 75000.0)
-    with c2:
-        num_products = st.selectbox("Kullandığı Bankacılık Ürün Sayısı", [1, 2, 3, 4])
-        is_active = st.radio("Dijital Kanallarda Aktif mi?", ["Evet", "Hayır"])
-        has_credit_card = st.selectbox("Kredi Kartı Var mı?", ["Evet", "Hayır"])
-        
-    # Anlık Churn Riski Hesaplama
-    risk_puani = (850 - credit_score) / 600 + (balance < 1000) * 0.3 + (num_products == 1) * 0.25
-    if is_active == "Hayır":
-        risk_puani += 0.2
-    risk_puani = min(risk_puani, 1.0)
+    df_sigorta = gercek_kasko_verisini_getir()
+    
+    col_x, col_y = st.columns(2)
+    with col_x:
+        st.metric("Veri Setindeki Toplam Poliçe", f"{len(df_sigorta):,}")
+    with col_y:
+        st.metric("Toplam Kaydedilen Hasar", f"{df_sigorta['ClaimNb'].sum():,}")
         
     st.markdown("---")
-    st.metric("Tahmini Terk (Churn) Olasılığı", f"%{risk_puani*100:.1f}")
+    st.subheader("🔍 Sürücü Yaşına Göre Ortalama Hasar Dağılımı")
     
-    if risk_puani > 0.65:
-        st.error("🚨 **YÜKSEK TERK RİSKİ!**")
-        st.write("💡 **Aksiyon Önerisi:** Müşteri temsilcisi atanmalı, kredi kartı aidat indirimi veya özel mevduat faiz oranı teklif edilmelidir.")
-    else:
-        st.success("✅ **Müşteri Sadık / Düşük Risk**")
-        st.info("💡 **Aksiyon Önerisi:** Mevcut çapraz satış (cross-sell) fırsatları değerlendirilebilir.")
-
-    # Kredi Skoru vs Churn Riski Görsel Grafiği
-    st.markdown("### 📊 Risk Analizi: Kredi Skoru ve Terk Olasılığı İlişkisi")
-    skor_araligi = list(range(350, 851, 25))
-    simulasyon_risk = [min(max(((850 - s) / 600 + (balance < 1000) * 0.3 + (num_products == 1) * 0.25), 0.0), 1.0) * 100 for s in skor_araligi]
-
-    fig_churn = go.Figure()
-    fig_churn.add_trace(go.Scatter(
-        x=skor_araligi, 
-        y=simulasyon_risk, 
-        mode='lines+markers', 
-        name='Kredi Skoru Bazlı Churn Riski', 
-        line=dict(color='#ffa15a', width=3)
-    ))
-    fig_churn.update_layout(
-        xaxis_title="Kredi Skoru",
-        yaxis_title="Terk Olasılığı (%)",
-        template="plotly_white"
-    )
-    st.plotly_chart(fig_churn, use_container_width=True)
+    yas_hasar = df_sigorta.groupby('DrivAge')['ClaimNb'].mean().reset_index()
+    fig_hasar = px.line(yas_hasar, x='DrivAge', y='ClaimNb', title="Yaş Bazlı Ortalama Hasar Frekansı", markers=True)
+    fig_hasar.update_layout(template="plotly_white", xaxis_title="Sürücü Yaşı", yaxis_title="Ortalama Hasar Sayısı")
+    st.plotly_chart(fig_hasar, use_container_width=True)
 
 # ---------------------------------------------------------
-# MODÜL 3: VARLIK & PORTFÖY RİSK ANALİZİ
+# MODÜL 3: VARLIK DAĞILIMI & RİSK SİMÜLATÖRÜ
 # ---------------------------------------------------------
-elif modul == "📈 Varlık & Portföy Risk Analizi":
+elif modul == "Varlık Dağılımı & Risk Simülatörü":
     st.header("📈 Yatırım Portföyü Risk ve Varlık Dağılım Simülatörü")
     st.write("Modern Portföy Teorisi temelleriyle farklı varlık sınıflarının getiri ve risk simülasyonunu inceleyin.")
     
@@ -187,7 +184,6 @@ elif modul == "📈 Varlık & Portföy Risk Analizi":
         m2.metric("Portföy Volatilitesi (Risk)", f"%{portfoy_risk*100:.2f}")
         m3.metric("Sharpe Oranı", f"{sharpe_orani:.2f}")
         
-        # İnteraktif Pasta Grafik
         df_portfoy = pd.DataFrame({
             'Varlık Sınıfı': ['Hisse Senedi', 'Tahvil / Bono', 'Altın'],
             'Ağırlık': [w_hisse, w_tahvil, w_altin]
@@ -196,18 +192,133 @@ elif modul == "📈 Varlık & Portföy Risk Analizi":
         st.plotly_chart(fig_portfoy, use_container_width=True)
 
 # ---------------------------------------------------------
-# MODÜL 4: HAKKINDA & İLETİŞİM (PORTFOLIO VITRINI)
+# MODÜL 4: BENCHMARK & ENFLASYON KIYASLAMA
+# ---------------------------------------------------------
+elif modul == "Benchmark & Enflasyon Kıyaslama":
+    st.header("📊 Benchmark ve Piyasa Kıyaslama Analizi")
+    st.write("Oluşturduğunuz portföy getirisini BIST 100 ve Enflasyon oranlarıyla karşılaştırın.")
+    
+    b_hisse = st.slider("Hisse Senedi Oranı (%)", 0, 100, 50, key="b_hisse")
+    b_tahvil = st.slider("Tahvil Oranı (%)", 0, 100, 30, key="b_tahvil")
+    b_altin = st.slider("Altın Oranı (%)", 0, 100, 20, key="b_altin")
+    
+    if b_hisse + b_tahvil + b_altin == 100:
+        portfoy_getirisi = (b_hisse / 100 * 0.28) + (b_tahvil / 100 * 0.18) + (b_altin / 100 * 0.22)
+        
+        karsilastirma_df = pd.DataFrame({
+            'Varlık / Endeks': ['Senin Portföyün', 'BIST 100 (Endeks)', 'TÜFE (Enflasyon)', 'Altın (GSYİH)'],
+            'Yıllık Getiri (%)': [portfoy_getirisi * 100, 24.5, 38.0, 22.0]
+        })
+        
+        fig_bench = px.bar(
+            karsilastirma_df, 
+            x='Varlık / Endeks', 
+            y='Yıllık Getiri (%)',
+            text='Yıllık Getiri (%)',
+            color='Varlık / Endeks',
+            color_discrete_map={
+                'Senin Portföyün': '#ff4b4b',
+                'BIST 100 (Endeks)': '#1f77b4',
+                'TÜFE (Enflasyon)': '#7f7f7f',
+                'Altın (GSYİH)': '#bcbd22'
+            }
+        )
+        fig_bench.update_traces(texttemplate='%{text:.1f}%', textposition='outside')
+        fig_bench.update_layout(template="plotly_white", showlegend=False, yaxis_title="Yıllık Getiri Oranı (%)")
+        st.plotly_chart(fig_bench, use_container_width=True)
+    else:
+        st.warning("Toplam ağırlık %100 olmalıdır.")
+
+# ---------------------------------------------------------
+# MODÜL 5: OTOMATİK KREDİ RİSK SKORLAMA
+# ---------------------------------------------------------
+elif modul == "Otomatik Kredi Risk Skorlama":
+    st.header("🤖 Otomatik Kredi Risk Skorlama ve Sınıflandırma")
+    st.write("Banka müşterilerinin kredi başvuru verilerini işleyerek temerrüt (default) riskini hesaplayın.")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        gelir = st.number_input("Aylık Net Gelir (TL)", 10000.0, 500000.0, 45000.0)
+        borc_orani = st.slider("Mevcut Borç / Gelir Oranı (%)", 0, 100, 35)
+    with col2:
+        kredi_gecmisi = st.selectbox("Kredi Geçmişi Durumu", ["Çok İyi", "Orta", "Riskli / Gecikmeli"])
+        calisma_suresi = st.slider("Mevcut İş Yerindeki Çalışma Süresi (Yıl)", 0, 30, 4)
+        
+    risk_skoru = (borc_orani * 0.6) + (0 if kredi_gecmisi == "Çok İyi" else (20 if kredi_gecmisi == "Orta" else 50)) - (calisma_suresi * 1.5)
+    risk_skoru = max(min(risk_skoru, 100.0), 0.0)
+    
+    st.markdown("---")
+    st.metric("Hesaplanan Kredi Temerrüt Risk Skoru", f"%{risk_skoru:.1f}")
+    
+    if risk_skoru > 60:
+        st.error("🚨 **Yüksek Kredi Riski:** Kredi talebinin reddedilmesi veya ek teminat istenmesi önerilir.")
+    else:
+        st.success("✅ **Uygun Kredi Profili:** Kredi onay süreci için uygundur.")
+
+# ---------------------------------------------------------
+# MODÜL 6: MÜŞTERİ KAYBI (CHURN) ERKEN UYARI
+# ---------------------------------------------------------
+elif modul == "Müşteri Kaybı (Churn) Erken Uyarı":
+    st.header("🏦 Banka Müşteri Kaybı (Churn) Erken Uyarı Sistemi")
+    st.write("Makine öğrenmesi altyapısıyla bankayı terk etme potansiyeli taşıyan müşterileri önceden tespit edin.")
+    
+    c1, c2 = st.columns(2)
+    with c1:
+        credit_score = st.slider("Kredi Skoru", 350, 850, 650)
+        age = st.slider("Müşteri Yaşı", 18, 80, 38)
+        balance = st.number_input("Vadesiz / Vadeli Hesap Bakiyesi (TL)", 0.0, 500000.0, 75000.0)
+    with c2:
+        num_products = st.selectbox("Kullandığı Bankacılık Ürün Sayısı", [1, 2, 3, 4])
+        is_active = st.radio("Dijital Kanallarda Aktif mi?", ["Evet", "Hayır"])
+        has_credit_card = st.selectbox("Kredi Kartı Var mı?", ["Evet", "Hayır"])
+        
+    risk_puani = (850 - credit_score) / 600 + (balance < 1000) * 0.3 + (num_products == 1) * 0.25
+    if is_active == "Hayır":
+        risk_puani += 0.2
+    risk_puani = min(risk_puani, 1.0)
+        
+    st.markdown("---")
+    st.metric("Tahmini Terk (Churn) Olasılığı", f"%{risk_puani*100:.1f}")
+    
+    if risk_puani > 0.65:
+        st.error("🚨 **YÜKSEK TERK RİSKİ!**")
+        st.write("💡 **Aksiyon Önerisi:** Müşteri temsilcisi atanmalı, kredi kartı aidat indirimi veya özel mevduat faiz oranı teklif edilmelidir.")
+    else:
+        st.success("✅ **Müşteri Sadık / Düşük Risk**")
+        st.info("💡 **Aksiyon Önerisi:** Mevcut çapraz satış (cross-sell) fırsatları değerlendirilebilir.")
+
+    st.markdown("### 📊 Risk Analizi: Kredi Skoru ve Terk Olasılığı İlişkisi")
+    skor_araligi = list(range(350, 851, 25))
+    simulasyon_risk = [min(max(((850 - s) / 600 + (balance < 1000) * 0.3 + (num_products == 1) * 0.25), 0.0), 1.0) * 100 for s in skor_araligi]
+
+    fig_churn = go.Figure()
+    fig_churn.add_trace(go.Scatter(
+        x=skor_araligi, 
+        y=simulasyon_risk, 
+        mode='lines+markers', 
+        name='Kredi Skoru Bazlı Churn Riski', 
+        line=dict(color='#ffa15a', width=3)
+    ))
+    fig_churn.update_layout(
+        xaxis_title="Kredi Skoru",
+        yaxis_title="Terk Olasılığı (%)",
+        template="plotly_white"
+    )
+    st.plotly_chart(fig_churn, use_container_width=True)
+
+# ---------------------------------------------------------
+# MODÜL 7: HAKKINDA & İLETİŞİM
 # ---------------------------------------------------------
 elif modul == "👩‍💻 Hakkımda & İletişim":
     st.header("👩‍💻 Proje Sahibi & Portfolyo Vitrini")
     st.markdown("""
     Merhaba! Ben **Sultan Kuş**, İstanbul Üniversitesi Matematik mezunuyum. Veri bilimi, yapay zeka, finansal risk analitiği ve aktüerya alanlarında projeler geliştiriyorum.
     
-    Bu platform; teorik finans modellerini pratik yazılım ürünlerine dönüştürme vizyonumun bir parçasıdır.
+    Bu platform; teorik finans modellerini, açık kaynak veri setlerini ve makine öğrenmesi algoritmalarını pratik yazılım ürünlerine dönüştürme vizyonumun bir parçasıdır.
     
     ### 🔗 Bağlantılar ve İletişim
     * **GitHub:** [Profilim](https://github.com)
     * **LinkedIn:** [Profilim](https://linkedin.com)
-    * **Odak Alanlarım:** Kredi Riski, Aktüerya, Portföy Yönetimi, Bankacılık Analitiği, Python & ML.
+    * **Odak Alanlarım:** Kredi Riski, Aktüerya, Portföy Veri Bilimi, Bankacılık Analitiği, Python & ML.
     """)
     st.success("✨ Bu platform işe alım mülakatlarında ve portfolyo sunumlarında teknik yetkinliği kanıtlamak amacıyla tasarlanmıştır.")
