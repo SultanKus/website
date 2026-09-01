@@ -3,6 +3,10 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
+import joblib
+
+# GitHub'daki models klasöründen eğitilmiş modeli yüklüyoruz
+kasko_model = joblib.load('models/kasko_model.pkl')
 
 # Sayfa Yapılandırması (Geniş Ekran)
 st.set_page_config(
@@ -31,9 +35,9 @@ modul = st.sidebar.selectbox(
 # ---------------------------------------------------------
 # MODÜL 1: AKTÜERYAL KASKO SAF PRİM FİYATLAMASI
 # ---------------------------------------------------------
-if modul == "🚗 Aktüeryal Kasko Saf Prim Fiyatlaması":
+elif modul == "🚗 Aktüeryal Kasko Saf Prim Fiyatlaması":
     st.header("🚗 Aktüeryal Kasko Saf Prim (Pure Premium) Fiyatlama Motoru")
-    st.write("Poisson (Hasar Frekansı) ve Gamma (Hasar Şiddeti) dağılımlarını kullanarak risk bazlı adil kasko primi hesaplayın.")
+    st.write("Eğitilmiş Makine Öğrenmesi Modeli ile risk bazlı adil kasko primi hesaplayın.")
     
     col1, col2 = st.columns(2)
     with col1:
@@ -45,10 +49,17 @@ if modul == "🚗 Aktüeryal Kasko Saf Prim Fiyatlaması":
         veh_brand = st.selectbox("Araç Markası", ["Renault", "Volkswagen", "Peugeot", "BMW", "Citroen"])
         veh_gas = st.selectbox("Yakıt Türü", ["Diesel", "Regular"])
         
-    # Anlık Hesaplama
-    tahmin_frekans = 0.04 + (driv_age < 25) * 0.12 + (bonus_malus / 1200)
-    tahmin_siddet = 4000 + (veh_power * 300) + (bonus_malus * 30)
-    saf_prim = tahmin_frekans * tahmin_siddet
+    # --- İŞTE BURASI KRİTİK KISIM ---
+    # Kullanıcının seçtiği girdileri modelin anlayacağı tablo formatına çeviriyoruz
+    girdi_df = pd.DataFrame(
+        [[driv_age, veh_age, veh_power, bonus_malus]], 
+        columns=['driv_age', 'veh_age', 'veh_power', 'bonus_malus']
+    )
+    
+    # Doğrudan GitHub'a yüklediğimiz .pkl modeline tahmin yaptırıyoruz!
+    saf_prim = kasko_model.predict(girdi_df)[0]
+    tahmin_frekans = 0.08  # Görsel gösterim için sabit oran
+    # -------------------------------
     
     st.markdown("---")
     m1, m2 = st.columns(2)
@@ -65,8 +76,9 @@ if modul == "🚗 Aktüeryal Kasko Saf Prim Fiyatlaması":
     st.subheader("📊 Risk Analizi: Sürücü Yaşı ve Prim Değişim Eğrisi")
     
     yas_listesi = list(range(18, 81))
+    # Grafikte de artık statik formül yerine modelin .predict() metodunu kullanıyoruz
     simulasyon_primleri = [
-        (0.04 + (y < 25) * 0.12 + (bonus_malus / 1200)) * (4000 + (veh_power * 300) + (bonus_malus * 30)) 
+        kasko_model.predict(pd.DataFrame([[y, veh_age, veh_power, bonus_malus]], columns=['driv_age', 'veh_age', 'veh_power', 'bonus_malus']))[0] 
         for y in yas_listesi
     ]
 
@@ -75,7 +87,7 @@ if modul == "🚗 Aktüeryal Kasko Saf Prim Fiyatlaması":
         x=yas_listesi, 
         y=simulasyon_primleri, 
         mode='lines+markers', 
-        name='Yaş Bazlı Saf Prim', 
+        name='Model Tahmini Saf Prim', 
         line=dict(color='#ff4b4b', width=3)
     ))
     fig.update_layout(
