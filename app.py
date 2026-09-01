@@ -4,7 +4,6 @@ import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 import joblib
-
 from utils import kasko_modelini_yukle, gercek_kasko_verisini_getir
 
 # Ortak modeli çağırıyoruz
