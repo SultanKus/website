@@ -31,7 +31,6 @@
         "colab": {
           "base_uri": "https://localhost:8080/"
         },
-        "collapsed": true,
         "id": "gSfG4Ai1WAoE",
         "outputId": "03060b67-43bb-49f5-b051-298bbf244345"
       },
