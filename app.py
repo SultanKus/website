@@ -24,10 +24,16 @@ st.markdown("""
         background-color: #f8f9fa;
         font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
     }
-    /* Üst Appbar (Header) ve Sidebar Renk Uyumu (Kurumsal Lacivert) */
+    /* Üst Appbar - Şık ve Uyumlu Kurumsal Renk */
     header[data-testid="stHeader"] {
-        background-color: #f8f9fa !important;
+        background-color: #111827 !important;
     }
+    /* Üst Appbar Sağ Köşe Buton ve İkonlarının Rengini Tam Siyah Yapma */
+    header[data-testid="stHeader"] button, header[data-testid="stHeader"] svg {
+        color: #000000 !important;
+        fill: #000000 !important;
+    }
+    /* Kenar Çubuğu Kurumsal Tasarım */
     [data-testid="stSidebar"] {
         background-color: #0b1f33;
         color: #ffffff;
@@ -41,12 +47,16 @@ st.markdown("""
         font-weight: 700 !important;
         letter-spacing: -0.5px;
     }
-    /* Slider ve Aktif Bileşenlerin Renklerini Kurumsal Maviye Çevirme */
-    .stSlider slider-highlight, div.stSlider [data-baseweb="slider"] div[role="slider"] {
+    /* Slider ve İnteraktif Bileşenlerdeki Rengi Kurumsal Maviye Çevirme */
+    .stSlider [data-baseweb="slider"] div[role="slider"] {
         background-color: #0055a5 !important;
+        border-color: #0055a5 !important;
     }
     .stSlider [data-baseweb="slider"] div > div > div > div {
         background-color: #0055a5 !important;
+    }
+    input[type="range"] {
+        accent-color: #0055a5 !important;
     }
     /* Metrik Kartları */
     div.stMetric {
@@ -108,24 +118,20 @@ def gecmisi_getir():
     return df
 
 # ---------------------------------------------------------
-# GÜVENLİ MODEL VE VERİ YÜKLEME
+# GÜVENLİ MODEL VE VERİ YÜKLEME (DİNAMİK DOSYA DESTEKLİ)
 # ---------------------------------------------------------
 @st.cache_data
-def gercek_kasko_verisini_getir():
+def varsayilan_kasko_verisi_getir():
     dataset = fetch_openml(name='freMTPL2freq', version=1, as_frame=True, parser='auto')
     df = dataset.frame
     return df[['VehPower', 'VehAge', 'DrivAge', 'ClaimNb', 'Exposure']].dropna()
 
-@st.cache_resource
-def kasko_modelini_yukle():
-    df = gercek_kasko_verisini_getir().head(1000)
-    X = df[['DrivAge', 'VehAge', 'VehPower']]
-    y = df['ClaimNb'] * 12000 + 4000
+def model_egit(df_egitim):
+    X = df_egitim[['DrivAge', 'VehAge', 'VehPower']]
+    y = df_egitim['ClaimNb'] * 12000 + 4000
     model = LinearRegression()
     model.fit(X, y)
     return model
-
-kasko_model = kasko_modelini_yukle()
 
 # ---------------------------------------------------------
 # SAYFA FONKSİYONLARI (MODÜLLER)
@@ -148,7 +154,7 @@ def ana_sayfa():
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Aktüeryal Modüller", "4 Ana Başlık")
     c2.metric("Veritabanı Altyapısı", "SQLite (Loglama)")
-    c3.metric("Veri Seti Kaynağı", "Açık Kaynak (freMTPL2)")
+    c3.metric("Veri Kaynağı", "Dinamik CSV/Excel & Açık Kaynak")
     c4.metric("Raporlama Desteği", "XlsxWriter (Excel)")
     
     st.markdown("---")
@@ -166,18 +172,43 @@ def ana_sayfa():
         * **Kalıcılık & Veri Akışı:** Yapılan tüm simülasyonların ilişkisel bir veritabanına anlık olarak loglanması.
         """)
     
-    st.info("👈 Sol menüden modülleri seçerek simülasyonları gerçekleştirebilir ve veritabanı kayıtlarını inceleyebilirsiniz.")
+    st.info("👈 Sol menüden modülleri seçerek simülasyonları gerçekleştirebilir, dilerseniz kendi veri setinizi yükleyerek modelleri çalıştırabilirsiniz.")
 
 def kasko_fiyatlama_sayfasi():
     st.header("Aktüeryal Kasko Saf Prim (Pure Premium) Fiyatlama Motoru")
-    st.write("Açık kaynak gerçek sigorta veri setiyle eğitilmiş Makine Öğrenmesi Modeli üzerinden risk bazlı adil kasko primi hesaplayın.")
+    st.write("Hazır açık kaynak veri setini kullanabilir veya **kendi veri setinizi yükleyerek** modelin anlık olarak sizin verilerinizle eğitilmesini sağlayabilirsiniz.")
     
     with st.expander("📖 Teorik Arka Plan & Model Mantığı"):
         st.markdown("""
-        * **Matematiksel Model:** Bu modülde, sürücü yaşı, araç yaşı ve motor gücü gibi risk faktörleri kullanılarak Genelleştirilmiş Doğrusal Modeller (GLM) ve regresyon yaklaşımlarıyla saf prim ($Pure Premium = Hasar Frekansı \\times Hasar Şiddeti$) tahmini yapılır.
-        * **Sektörel Karşılık:** Sigorta şirketleri bu modelle risk profili yüksek poliçelere daha yüksek prim yüklerken, düşük riskli sürücülere rekabetçi teklifler sunar.
+        * **Matematiksel Model:** Bu modülde, sürücü yaşı, araç yaşı ve motor gücü gibi risk faktörleri kullanılarak Genelleştirilmiş Doğrusal Modeller (GLM) ve regresyon yaklaşımlarıyla saf prim tahmini yapılır.
+        * **Kendi Verinizi Kullanma:** Yükleyeceğiniz CSV/Excel dosyasında `DrivAge`, `VehAge`, `VehPower` ve `ClaimNb` kolonlarının bulunması modelin kusursuz çalışmasını sağlar.
         """)
     
+    st.markdown("---")
+    yuklenen_dosya = st.file_uploader("📂 Kendi Veri Setinizi Yükleyin (CSV veya Excel)", type=["csv", "xlsx"])
+    
+    if yuklenen_dosya is not None:
+        try:
+            if yuklenen_dosya.name.endswith('.csv'):
+                user_df = pd.read_csv(yuklenen_dosya)
+            else:
+                user_df = pd.read_excel(yuklenen_dosya)
+            
+            GEREKLI_KOLONLAR = ['DrivAge', 'VehAge', 'VehPower', 'ClaimNb']
+            if all(kol in user_df.columns for kol in GEREKLI_KOLONLAR):
+                st.success("✅ Veri setiniz başarıyla yüklendi ve doğrulandı! Model sizin verilerinizle yeniden eğitiliyor.")
+                aktif_df = user_df[GEREKLI_KOLONLAR].dropna().head(2000)
+            else:
+                st.warning("⚠️ Yüklediğiniz dosyada gerekli kolonlar eksik ('DrivAge', 'VehAge', 'VehPower', 'ClaimNb'). Varsayılan veri setine dönülüyor.")
+                aktif_df = varsayilan_kasko_verisi_getir().head(1000)
+        except Exception as e:
+            st.error(f"Dosya okunurken bir hata oluştu: {e}. Varsayılan veriye dönülüyor.")
+            aktif_df = varsayilan_kasko_verisi_getir().head(1000)
+    else:
+        aktif_df = varsayilan_kasko_verisi_getir().head(1000)
+
+    dinamik_model = model_egit(aktif_df)
+
     col1, col2 = st.columns(2)
     with col1:
         driv_age = st.slider("Sürücü Yaşı (DrivAge)", 18, 90, 28)
@@ -189,7 +220,7 @@ def kasko_fiyatlama_sayfasi():
         veh_gas = st.selectbox("Yakıt Türü", ["Diesel", "Regular"])
         
     girdi_df = pd.DataFrame([[driv_age, veh_age, veh_power]], columns=['DrivAge', 'VehAge', 'VehPower'])
-    saf_prim = kasko_model.predict(girdi_df)[0]
+    saf_prim = dinamik_model.predict(girdi_df)[0]
     
     st.markdown("---")
     m1, m2 = st.columns(2)
@@ -203,7 +234,7 @@ def kasko_fiyatlama_sayfasi():
         st.success("✅ Simülasyon başarıyla SQLite veritabanına loglandı!")
 
     yas_listesi = list(range(18, 81))
-    simulasyon_primleri = [kasko_model.predict(pd.DataFrame([[y, veh_age, veh_power]], columns=['DrivAge', 'VehAge', 'VehPower']))[0] for y in yas_listesi]
+    simulasyon_primleri = [dinamik_model.predict(pd.DataFrame([[y, veh_age, veh_power]], columns=['DrivAge', 'VehAge', 'VehPower']))[0] for y in yas_listesi]
 
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=yas_listesi, y=simulasyon_primleri, mode='lines+markers', name='Model Tahmini Saf Prim', line=dict(color='#0055a5', width=3)))
@@ -215,7 +246,7 @@ def hasar_frekans_sayfasi():
     with st.expander("📖 Teorik Arka Plan & Model Mantığı"):
         st.markdown("Gerçek portföy verilerindeki hasar olasılıklarının yaş ve demografik kırılımlara göre dağılımını inceler.")
     
-    df_sigorta = gercek_kasko_verisini_getir()
+    df_sigorta = varsayilan_kasko_verisi_getir()
     st.metric("Veri Setindeki Toplam Poliçe", f"{len(df_sigorta):,}")
     yas_hasar = df_sigorta.groupby('DrivAge')['ClaimNb'].mean().reset_index()
     fig_hasar = px.line(yas_hasar, x='DrivAge', y='ClaimNb', title="Yaş Bazlı Ortalama Hasar Frekansı", markers=True)
@@ -374,30 +405,30 @@ def hakkinda_sayfasi():
     st.success("✨ Bu platform, risk yönetimi ve aktüeryal analitik alanındaki teknik yetkinlikleri sergilemek amacıyla aktif olarak geliştirilmektedir.")
 
 # ---------------------------------------------------------
-# STREAMLIT MULTIPAGE NAVIGASYON YAPISI
+# STREAMLIT MULTIPAGE NAVIGASYON YAPISI (KURUMSAL İKONLU)
 # ---------------------------------------------------------
 pg = st.navigation({
     "Genel Bakış": [
-        st.Page(ana_sayfa, title="Ana Sayfa")
+        st.Page(ana_sayfa, title="Ana Sayfa", icon="🏠")
     ],
     "Sigorta & Aktüeryal": [
-        st.Page(kasko_fiyatlama_sayfasi, title="Kasko Saf Prim Fiyatlama"),
-        st.Page(hasar_frekans_sayfasi, title="Hasar Frekans & Risk"),
-        st.Page(reasurans_sayfasi, title="Reasürans & Afet Optimizasyonu"),
-        st.Page(stres_testi_sayfasi, title="Aktüeryal Stres Testi")
+        st.Page(kasko_fiyatlama_sayfasi, title="Kasko Saf Prim Fiyatlama", icon="🚗"),
+        st.Page(hasar_frekans_sayfasi, title="Hasar Frekans & Risk", icon="📈"),
+        st.Page(reasurans_sayfasi, title="Reasürans & Afet Optimizasyonu", icon="🌐"),
+        st.Page(stres_testi_sayfasi, title="Aktüeryal Stres Testi", icon="⚡")
     ],
     "Yatırım & Portföy": [
-        st.Page(varlik_dagilimi_sayfasi, title="Varlık Dağılım Simülatörü"),
-        st.Page(alm_sayfasi, title="Varlık-Yükümlülük Yönetimi (ALM)"),
-        st.Page(benchmark_sayfasi, title="Benchmark & Piyasa Kıyaslama")
+        st.Page(varlik_dagilimi_sayfasi, title="Varlık Dağılım Simülatörü", icon="🥧"),
+        st.Page(alm_sayfasi, title="Varlık-Yükümlülük Yönetimi (ALM)", icon="⚖️"),
+        st.Page(benchmark_sayfasi, title="Benchmark & Piyasa Kıyaslama", icon="📊")
     ],
     "ML & Finansal Skorlama": [
-        st.Page(kredi_risk_sayfasi, title="Kredi Risk Skorlama"),
-        st.Page(churn_sayfasi, title="Müşteri Kaybı (Churn) Erken Uyarı")
+        st.Page(kredi_risk_sayfasi, title="Kredi Risk Skorlama", icon="🤖"),
+        st.Page(churn_sayfasi, title="Müşteri Kaybı (Churn) Erken Uyarı", icon="🏦")
     ],
     "Sistem & İletişim": [
-        st.Page(veritabani_sayfasi, title="Simülasyon Veritabanı Geçmişi"),
-        st.Page(hakkinda_sayfasi, title="Hakkımda & İletişim")
+        st.Page(veritabani_sayfasi, title="Simülasyon Veritabanı Geçmişi", icon="📂"),
+        st.Page(hakkinda_sayfasi, title="Hakkımda & İletişim", icon="👩‍💻")
     ]
 })
 
