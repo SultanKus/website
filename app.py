@@ -26,7 +26,7 @@ st.markdown("""
     }
     /* Üst Appbar (Header) ve Sidebar Renk Uyumu (Kurumsal Lacivert) */
     header[data-testid="stHeader"] {
-        background-color: #0b1f33 !important;
+        background-color: #1e293b !important;
     }
     [data-testid="stSidebar"] {
         background-color: #0b1f33;
