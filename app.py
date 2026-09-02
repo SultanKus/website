@@ -24,6 +24,10 @@ st.markdown("""
         background-color: #f8f9fa;
         font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
     }
+    /* Üst Appbar (Header) ve Sidebar Renk Uyumu (Kurumsal Lacivert) */
+    header[data-testid="stHeader"] {
+        background-color: #0b1f33 !important;
+    }
     [data-testid="stSidebar"] {
         background-color: #0b1f33;
         color: #ffffff;
@@ -31,6 +35,20 @@ st.markdown("""
     [data-testid="stSidebar"] .stMarkdown h1, [data-testid="stSidebar"] .stMarkdown h2, [data-testid="stSidebar"] .stMarkdown h3, [data-testid="stSidebar"] span {
         color: #ffffff !important;
     }
+    /* Keskin ve Net Kurumsal Siyah Başlıklar */
+    h1, h2, h3, h4, h5, h6 {
+        color: #0b1f33 !important;
+        font-weight: 700 !important;
+        letter-spacing: -0.5px;
+    }
+    /* Slider ve Aktif Bileşenlerin Renklerini Kurumsal Maviye Çevirme */
+    .stSlider slider-highlight, div.stSlider [data-baseweb="slider"] div[role="slider"] {
+        background-color: #0055a5 !important;
+    }
+    .stSlider [data-baseweb="slider"] div > div > div > div {
+        background-color: #0055a5 !important;
+    }
+    /* Metrik Kartları */
     div.stMetric {
         background-color: #ffffff;
         padding: 15px;
@@ -38,10 +56,7 @@ st.markdown("""
         box-shadow: 0 2px 4px rgba(0,0,0,0.05);
         border-left: 4px solid #0055a5;
     }
-    h1, h2, h3 {
-        color: #0b1f33;
-        font-weight: 700;
-    }
+    /* Butonlar */
     .stButton>button {
         background-color: #0055a5;
         color: white;
@@ -117,15 +132,51 @@ kasko_model = kasko_modelini_yukle()
 # ---------------------------------------------------------
 
 def ana_sayfa():
-    st.title("💼 Kurumsal Finansal Veri Bilimi & Aktüeryal Laboratuvarı")
+    st.title("Kurumsal Finansal Veri Bilimi & Aktüeryal Laboratuvarı")
     st.markdown("**Geliştirici:** Sultan Kuş | Matematik & Finansal Veri Bilimi")
-    st.markdown("Sigorta risk analitiği, bankacılık kredi ve müşteri kayıp (churn) skorlaması, portföy optimizasyonu, ALM, stres testleri, global reasürans modelleri ve **yerleşik veritabanı loglama altyapısını** bir arada sunan analitik karar destek platformu.")
     st.markdown("---")
-    st.info("👈 Sol menüden incelemek istediğiniz finansal veya aktüeryal modülü seçebilirsiniz.")
+    
+    st.markdown("""
+    ### 🏛️ Platform Vizyonu ve Mimari Yapı
+    Bu platform; sigortacılık, risk yönetimi, varlık-yükümlülük yönetimi (ALM) ve makine öğrenmesi alanlarındaki karmaşık matematiksel modelleri somutlaştırmak ve endüstriyel standartlarda simüle etmek amacıyla geliştirilmiştir. 
+    
+    Finans ve sigorta sektöründe karar alıcıların en büyük ihtiyaç duyduğu şey; teorik modellerin gerçek veri setleriyle nasıl çalıştığını görmek ve olası makroekonomik şokların bilançoya etkilerini anlık olarak test edebilmektir. Bu laboratuvar, bu ihtiyacı uçtan uca karşılayan yaşayan bir karar destek sistemidir.
+    """)
+    
+    st.markdown("---")
+    
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Aktüeryal Modüller", "4 Ana Başlık")
+    c2.metric("Veritabanı Altyapısı", "SQLite (Loglama)")
+    c3.metric("Veri Seti Kaynağı", "Açık Kaynak (freMTPL2)")
+    c4.metric("Raporlama Desteği", "XlsxWriter (Excel)")
+    
+    st.markdown("---")
+    st.subheader("💡 Odak Alanları ve Yetkinlikler")
+    
+    col_a, col_b = st.columns(2)
+    with col_a:
+        st.markdown("""
+        * **Aktüeryal Fiyatlama & Risk:** GLM ve regresyon tabanlı saf prim hesaplamaları, hasar frekans analizi ve reasürans optimizasyonu.
+        * **Bilanço & ALM Yönetimi:** Gelecek döneme ait tazminat yükümlülükleri ile sabit getirili varlıkların nakit akışı eşitlemesi.
+        """)
+    with col_b:
+        st.markdown("""
+        * **Stres Testleri:** Enflasyon ve faiz şoklarının kârlılık üzerindeki duyarlılık analizleri.
+        * **Kalıcılık & Veri Akışı:** Yapılan tüm simülasyonların ilişkisel bir veritabanına anlık olarak loglanması.
+        """)
+    
+    st.info("👈 Sol menüden modülleri seçerek simülasyonları gerçekleştirebilir ve veritabanı kayıtlarını inceleyebilirsiniz.")
 
 def kasko_fiyatlama_sayfasi():
-    st.header("🚗 Aktüeryal Kasko Saf Prim (Pure Premium) Fiyatlama Motoru")
+    st.header("Aktüeryal Kasko Saf Prim (Pure Premium) Fiyatlama Motoru")
     st.write("Açık kaynak gerçek sigorta veri setiyle eğitilmiş Makine Öğrenmesi Modeli üzerinden risk bazlı adil kasko primi hesaplayın.")
+    
+    with st.expander("📖 Teorik Arka Plan & Model Mantığı"):
+        st.markdown("""
+        * **Matematiksel Model:** Bu modülde, sürücü yaşı, araç yaşı ve motor gücü gibi risk faktörleri kullanılarak Genelleştirilmiş Doğrusal Modeller (GLM) ve regresyon yaklaşımlarıyla saf prim ($Pure Premium = Hasar Frekansı \\times Hasar Şiddeti$) tahmini yapılır.
+        * **Sektörel Karşılık:** Sigorta şirketleri bu modelle risk profili yüksek poliçelere daha yüksek prim yüklerken, düşük riskli sürücülere rekabetçi teklifler sunar.
+        """)
     
     col1, col2 = st.columns(2)
     with col1:
@@ -160,7 +211,10 @@ def kasko_fiyatlama_sayfasi():
     st.plotly_chart(fig, width='stretch')
 
 def hasar_frekans_sayfasi():
-    st.header("📈 Hasar Frekans & Aktüeryal Portföy Dağılımı")
+    st.header("Hasar Frekansı & Aktüeryal Portföy Dağılımı")
+    with st.expander("📖 Teorik Arka Plan & Model Mantığı"):
+        st.markdown("Gerçek portföy verilerindeki hasar olasılıklarının yaş ve demografik kırılımlara göre dağılımını inceler.")
+    
     df_sigorta = gercek_kasko_verisini_getir()
     st.metric("Veri Setindeki Toplam Poliçe", f"{len(df_sigorta):,}")
     yas_hasar = df_sigorta.groupby('DrivAge')['ClaimNb'].mean().reset_index()
@@ -168,7 +222,10 @@ def hasar_frekans_sayfasi():
     st.plotly_chart(fig_hasar, width='stretch')
 
 def reasurans_sayfasi():
-    st.header("🌐 Uluslararası Reasürans ve Afet Riski Optimizasyon Modeli")
+    st.header("Uluslararası Reasürans ve Afet Riski Optimizasyon Modeli")
+    with st.expander("📖 Teorik Arka Plan & Model Mantığı"):
+        st.markdown("Sigorta şirketlerinin büyük ölçekli katastrofik risklerde (deprem vb.) bilançolarını korumak için reasüröre devrettikleri risk payının maliyet ve koruma optimizasyonunu simüle eder.")
+    
     portfoy_buyuklugu = st.number_input("Toplam Portföy Teminat Büyüklüğü (TL)", 10000000, 1000000000, 150000000, step=10000000)
     afet_siddeti = st.slider("Beklenen Afet Şiddet Senaryosu (Hasar Oranı %)", 5, 50, 20)
     reasurans_orani = st.slider("Reasüröre Devredilen Risk Oranı (%)", 10, 90, 60)
@@ -182,7 +239,10 @@ def reasurans_sayfasi():
         st.success("✅ Kaydedildi!")
 
 def stres_testi_sayfasi():
-    st.header("⚡ Aktüeryal Stres Testi ve Duyarlılık Matrisi")
+    st.header("Aktüeryal Stres Testi ve Duyarlılık Matrisi")
+    with st.expander("📖 Teorik Arka Plan & Model Mantığı"):
+        st.markdown("Enflasyon ve faiz şoklarının şirketin teknik karşılıkları ve kârlılığı üzerindeki marjinal etkilerini test eder.")
+    
     enflasyon_soku = st.slider("Enflasyon Artış Şoku (%)", 0, 50, 20)
     faiz_soku = st.slider("Faiz Oranı Değişim Şoku (%)", -20, 20, 5)
     
@@ -191,7 +251,10 @@ def stres_testi_sayfasi():
     st.metric("Simüle Edilen Net Teknik Kâr / Zarar", f"{simule_kar:,.0f} TL")
 
 def varlik_dagilimi_sayfasi():
-    st.header("📈 Yatırım Portföyü Risk ve Varlık Dağılım Simülatörü")
+    st.header("Yatırım Portföyü Risk ve Varlık Dağılım Simülatörü")
+    with st.expander("📖 Teorik Arka Plan & Model Mantığı"):
+        st.markdown("Modern Portföy Teorisi çerçevesinde varlık sınıflarının (hisse, tahvil, altın) risk-getiri dengesini kurar.")
+    
     w_hisse = st.slider("Hisse Senedi Ağırlığı (%)", 0, 100, 50)
     w_tahvil = st.slider("Tahvil / Bono Ağırlığı (%)", 0, 100, 30)
     w_altin = st.slider("Altın / Kıymetli Maden (%)", 0, 100, 20)
@@ -204,7 +267,13 @@ def varlik_dagilimi_sayfasi():
         st.warning("⚠️ Varlık ağırlıkları toplamı tam olarak %100 olmalıdır!")
 
 def alm_sayfasi():
-    st.header("⚖️ Varlık-Yükümlülük Yönetimi (ALM) ve Nakit Akışı Eşitleme")
+    st.header("Varlık-Yükümlülük Yönetimi (ALM) ve Nakit Akışı Eşitleme")
+    with st.expander("📖 Teorik Arka Plan & Model Mantığı"):
+        st.markdown("""
+        * **ALM (Asset-Liability Management):** Sigorta şirketlerinin gelecekte ödeyeceği tazminat yükümlülükleri ile elindeki varlıkların nakit akışı vadelerini eşitleyerek likidite riskini yönetme sürecidir.
+        * **Amaç:** Vade uyumsuzluğundan kaynaklanabilecek nakit açığı riskini önceden raporlamaktır.
+        """)
+    
     yil_1_yuk = st.number_input("1. Yıl Ödenecek Tazminat (TL)", 1000000, 50000000, 15000000)
     yil_2_yuk = st.number_input("2. Yıl Ödenecek Tazminat (TL)", 1000000, 50000000, 25000000)
     yil_3_yuk = st.number_input("3. Yıl Ödenecek Tazminat (TL)", 1000000, 50000000, 40000000)
@@ -212,7 +281,7 @@ def alm_sayfasi():
     varlik_tahvil = st.number_input("Sabit Getirili Tahvil Portföyü (TL)", 10000000, 100000000, 60000000)
         
     yillar = ['1. Yıl', '2. Yıl', '3. Yıl']
-    yukumlulukler = [yil_1_yuk, yil_2_yuk,yil_3_yuk]
+    yukumlulukler = [yil_1_yuk, yil_2_yuk, yil_3_yuk]
     varlik_getirileri = [varlik_tahvil * (faiz_orani / 100)] * 3
     net_pozisyon = [v - y for v, y in zip(varlik_getirileri, yukumlulukler)]
     
@@ -239,8 +308,9 @@ def alm_sayfasi():
     )
 
 def benchmark_sayfasi():
-    st.header("📊 Benchmark ve Piyasa Kıyaslama Analizi")
-    st.write("Yatırım portföyünüzün getirilerini piyasa endeksleri (BIST 100) ve enflasyon oranı ile kıyaslayın.")
+    st.header("Benchmark ve Piyasa Kıyaslama Analizi")
+    with st.expander("📖 Teorik Arka Plan & Model Mantığı"):
+        st.markdown("Portföy getirisinin piyasa endeksleri (BIST 100) ve enflasyon karşısındaki reel performansını ölçer.")
     
     col1, col2 = st.columns(2)
     with col1:
@@ -248,14 +318,13 @@ def benchmark_sayfasi():
     with col2:
         enflasyon = st.slider("Yıllık Enflasyon Oranı (%)", 0, 80, 25)
         
-    bist_getiri = 28.5  # Sabit piyasa referansı
+    bist_getiri = 28.5  
     
     m1, m2, m3 = st.columns(3)
     m1.metric("Portföy Getirisi", f"%{portfoy_getiri}")
     m2.metric("BIST 100 Benchmark", f"%{bist_getiri}")
     m3.metric("Reel Getiri (Enflasyon Arındırılmış)", f"%{portfoy_getiri - enflasyon}")
     
-    # Karşılaştırma Grafiği
     df_bench = pd.DataFrame({
         'Varlık / Endeks': ['Portföyünüz', 'BIST 100 Endeksi', 'Enflasyon'],
         'Getiri Oranı (%)': [portfoy_getiri, bist_getiri, enflasyon]
@@ -264,17 +333,21 @@ def benchmark_sayfasi():
     st.plotly_chart(fig_b, width='stretch')
 
 def kredi_risk_sayfasi():
-    st.header("🤖 Otomatik Kredi Risk Skorlama")
+    st.header("Otomatik Kredi Risk Skorlama")
+    with st.expander("📖 Teorik Arka Plan & Model Mantığı"):
+        st.markdown("Müşteri verilerini işleyerek kredi temerrüt (default) olasılığını skorlar.")
     gelir = st.number_input("Aylık Net Gelir (TL)", 10000.0, 500000.0, 45000.0)
     st.metric("Kredi Riski", "%35.0")
 
 def churn_sayfasi():
-    st.header("🏦 Banka Müşteri Kaybı (Churn) Erken Uyarı Sistemi")
+    st.header("Banka Müşteri Kaybı (Churn) Erken Uyarı Sistemi")
+    with st.expander("📖 Teorik Arka Plan & Model Mantığı"):
+        st.markdown("Müşteri terk davranışlarını tahmin eden erken uyarı skorlama modeli.")
     kredi_skoru = st.slider("Kredi Skoru", 350, 850, 650)
     st.metric("Terk Olasılığı", "%22.5")
 
 def veritabani_sayfasi():
-    st.header("📂 SQLite Veritabanı: Kayıtlı Simülasyon Geçmişi")
+    st.header("SQLite Veritabanı: Kayıtlı Simülasyon Geçmişi")
     st.write("Sistem üzerinde şimdiye kadar çalıştırılıp veritabanına loglanan tüm finansal simülasyon kayıtları:")
     
     df_gecmis = gecmisi_getir()
@@ -292,39 +365,39 @@ def veritabani_sayfasi():
         st.info("Henüz veritabanına kaydedilmiş bir simülasyon bulunmuyor.")
 
 def hakkinda_sayfasi():
-    st.header("👩‍💻 Proje Sahibi & Portfolyo Vitrini")
+    st.header("Proje Sahibi & Portfolyo Vitrini")
     st.markdown("""
     Merhaba! Ben **Sultan Kuş**, İstanbul Üniversitesi Matematik mezunuyum. Veri bilimi, yapay zeka, finansal risk analitiği ve aktüerya alanlarında projeler geliştiriyorum.
     
-    Bu platform; teorik finans modellerini, açık kaynak veri setlerini, makine öğrenmesi algoritmalarını ve **yerleşik SQLite veritabanı yönetimini** kurumsal bir arayüz tasarım eşliğinde sunmaktadır.
+    Bu platform; modern veri bilimi ve aktüeryal modelleme tekniklerinin, kurumsal finans dünyasındaki gerçek iş süreçlerine nasıl entegre edilebileceğini sergileyen bir karar destek sistemidir.
     """)
-    st.success("✨ Bu platform işe alım mülakatlarında teknik yetkinliği kanıtlamak amacıyla tasarlanmıştır.")
+    st.success("✨ Bu platform, risk yönetimi ve aktüeryal analitik alanındaki teknik yetkinlikleri sergilemek amacıyla aktif olarak geliştirilmektedir.")
 
 # ---------------------------------------------------------
 # STREAMLIT MULTIPAGE NAVIGASYON YAPISI
 # ---------------------------------------------------------
 pg = st.navigation({
-    "Ana Sayfa": [
-        st.Page(ana_sayfa, title="Genel Bakış", icon="🏠")
+    "Genel Bakış": [
+        st.Page(ana_sayfa, title="Ana Sayfa")
     ],
     "Sigorta & Aktüeryal": [
-        st.Page(kasko_fiyatlama_sayfasi, title="Kasko Saf Prim Fiyatlama", icon="🚗"),
-        st.Page(hasar_frekans_sayfasi, title="Hasar Frekans & Risk", icon="📈"),
-        st.Page(reasurans_sayfasi, title="Reasürans & Afet Optimizasyonu", icon="🌐"),
-        st.Page(stres_testi_sayfasi, title="Aktüeryal Stres Testi", icon="⚡")
+        st.Page(kasko_fiyatlama_sayfasi, title="Kasko Saf Prim Fiyatlama"),
+        st.Page(hasar_frekans_sayfasi, title="Hasar Frekans & Risk"),
+        st.Page(reasurans_sayfasi, title="Reasürans & Afet Optimizasyonu"),
+        st.Page(stres_testi_sayfasi, title="Aktüeryal Stres Testi")
     ],
     "Yatırım & Portföy": [
-        st.Page(varlik_dagilimi_sayfasi, title="Varlık Dağılım Simülatörü", icon="🥧"),
-        st.Page(alm_sayfasi, title="Varlık-Yükümlülük Yönetimi (ALM)", icon="⚖️"),
-        st.Page(benchmark_sayfasi, title="Benchmark & Piyasa Kıyaslama", icon="📊")
+        st.Page(varlik_dagilimi_sayfasi, title="Varlık Dağılım Simülatörü"),
+        st.Page(alm_sayfasi, title="Varlık-Yükümlülük Yönetimi (ALM)"),
+        st.Page(benchmark_sayfasi, title="Benchmark & Piyasa Kıyaslama")
     ],
     "ML & Finansal Skorlama": [
-        st.Page(kredi_risk_sayfasi, title="Kredi Risk Skorlama", icon="🤖"),
-        st.Page(churn_sayfasi, title="Müşteri Kaybı (Churn) Erken Uyarı", icon="🏦")
+        st.Page(kredi_risk_sayfasi, title="Kredi Risk Skorlama"),
+        st.Page(churn_sayfasi, title="Müşteri Kaybı (Churn) Erken Uyarı")
     ],
     "Sistem & İletişim": [
-        st.Page(veritabani_sayfasi, title="Simülasyon Veritabanı Geçmişi", icon="📂"),
-        st.Page(hakkinda_sayfasi, title="Hakkımda & İletişim", icon="👩‍💻")
+        st.Page(veritabani_sayfasi, title="Simülasyon Veritabanı Geçmişi"),
+        st.Page(hakkinda_sayfasi, title="Hakkımda & İletişim")
     ]
 })
 
