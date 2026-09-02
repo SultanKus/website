@@ -26,7 +26,7 @@ st.markdown("""
     }
     /* Üst Appbar - Şık ve Uyumlu Kurumsal Renk */
     header[data-testid="stHeader"] {
-        background-color: #111827 !important;
+        background-color: #ffffff !important;
     }
     /* Üst Appbar Sağ Köşe Buton ve İkonlarının Rengini Tam Siyah Yapma */
     header[data-testid="stHeader"] button, header[data-testid="stHeader"] svg {
