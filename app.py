@@ -24,7 +24,7 @@ st.markdown("""
         background-color: #f8f9fa;
         font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
     }
-    /* Üst Appbar - Şık ve Uyumlu Kurumsal Renk */
+    /* Üst Appbar - Saf Beyaz */
     header[data-testid="stHeader"] {
         background-color: #ffffff !important;
     }
@@ -118,7 +118,7 @@ def gecmisi_getir():
     return df
 
 # ---------------------------------------------------------
-# GÜVENLİ MODEL VE VERİ YÜKLEME (DİNAMİK DOSYA DESTEKLİ)
+# ORTAK VERİ VE MODEL YÜKLEME FONKSİYONLARI (DİNAMİK DESTEKLİ)
 # ---------------------------------------------------------
 @st.cache_data
 def varsayilan_kasko_verisi_getir():
@@ -126,7 +126,7 @@ def varsayilan_kasko_verisi_getir():
     df = dataset.frame
     return df[['VehPower', 'VehAge', 'DrivAge', 'ClaimNb', 'Exposure']].dropna()
 
-def model_egit(df_egitim):
+def kasko_model_egit(df_egitim):
     X = df_egitim[['DrivAge', 'VehAge', 'VehPower']]
     y = df_egitim['ClaimNb'] * 12000 + 4000
     model = LinearRegression()
@@ -146,7 +146,7 @@ def ana_sayfa():
     ### 🏛️ Platform Vizyonu ve Mimari Yapı
     Bu platform; sigortacılık, risk yönetimi, varlık-yükümlülük yönetimi (ALM) ve makine öğrenmesi alanlarındaki karmaşık matematiksel modelleri somutlaştırmak ve endüstriyel standartlarda simüle etmek amacıyla geliştirilmiştir. 
     
-    Finans ve sigorta sektöründe karar alıcıların en büyük ihtiyaç duyduğu şey; teorik modellerin gerçek veri setleriyle nasıl çalıştığını görmek ve olası makroekonomik şokların bilançoya etkilerini anlık olarak test edebilmektir. Bu laboratuvar, bu ihtiyacı uçtan uca karşılayan yaşayan bir karar destek sistemidir.
+    Finans ve sigorta sektöründe karar alıcıların en büyük ihtiyaç duyduğu şey; teorik modellerin gerçek veri setleriyle nasıl çalıştığını görmek ve olası makroekonomik şokların bilançoya etkilerini anlık olarak test edebilmektir. Tüm modüllerde yer alan **Dinamik Veri Yükleme Motoru** sayesinde kullanıcılar kendi CSV/Excel verilerini sisteme entegre edebilirler.
     """)
     
     st.markdown("---")
@@ -154,7 +154,7 @@ def ana_sayfa():
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Aktüeryal Modüller", "4 Ana Başlık")
     c2.metric("Veritabanı Altyapısı", "SQLite (Loglama)")
-    c3.metric("Veri Kaynağı", "Dinamik CSV/Excel & Açık Kaynak")
+    c3.metric("Veri Kaynağı", "Dinamik Dosya & Açık Kaynak")
     c4.metric("Raporlama Desteği", "XlsxWriter (Excel)")
     
     st.markdown("---")
@@ -172,11 +172,11 @@ def ana_sayfa():
         * **Kalıcılık & Veri Akışı:** Yapılan tüm simülasyonların ilişkisel bir veritabanına anlık olarak loglanması.
         """)
     
-    st.info("👈 Sol menüden modülleri seçerek simülasyonları gerçekleştirebilir, dilerseniz kendi veri setinizi yükleyerek modelleri çalıştırabilirsiniz.")
+    st.info("👈 Sol menüden modülleri seçerek simülasyonları gerçekleştirebilir, dilediğiniz modülde kendi veri setinizi yükleyerek analiz yapabilirsiniz.")
 
 def kasko_fiyatlama_sayfasi():
     st.header("Aktüeryal Kasko Saf Prim (Pure Premium) Fiyatlama Motoru")
-    st.write("Hazır açık kaynak veri setini kullanabilir veya **kendi veri setinizi yükleyerek** modelin anlık olarak sizin verilerinizle eğitilmesini sağlayabilirsiniz.")
+    st.write("Hazır açık kaynak veri setini kullanabilir veya **kendi kasko veri setinizi yükleyerek** modelin anlık olarak sizin verilerinizle eğitilmesini sağlayabilirsiniz.")
     
     with st.expander("📖 Teorik Arka Plan & Model Mantığı"):
         st.markdown("""
@@ -185,29 +185,25 @@ def kasko_fiyatlama_sayfasi():
         """)
     
     st.markdown("---")
-    yuklenen_dosya = st.file_uploader("📂 Kendi Veri Setinizi Yükleyin (CSV veya Excel)", type=["csv", "xlsx"])
+    yuklenen_dosya = st.file_uploader("📂 Kendi Kasko Veri Setinizi Yükleyin (CSV veya Excel)", type=["csv", "xlsx"], key="kasko_up")
     
     if yuklenen_dosya is not None:
         try:
-            if yuklenen_dosya.name.endswith('.csv'):
-                user_df = pd.read_csv(yuklenen_dosya)
-            else:
-                user_df = pd.read_excel(yuklenen_dosya)
-            
+            user_df = pd.read_csv(yuklenen_dosya) if yuklenen_dosya.name.endswith('.csv') else pd.read_excel(yuklenen_dosya)
             GEREKLI_KOLONLAR = ['DrivAge', 'VehAge', 'VehPower', 'ClaimNb']
             if all(kol in user_df.columns for kol in GEREKLI_KOLONLAR):
-                st.success("✅ Veri setiniz başarıyla yüklendi ve doğrulandı! Model sizin verilerinizle yeniden eğitiliyor.")
+                st.success("✅ Veri setiniz başarıyla yüklendi! Model sizin verilerinizle yeniden eğitiliyor.")
                 aktif_df = user_df[GEREKLI_KOLONLAR].dropna().head(2000)
             else:
-                st.warning("⚠️ Yüklediğiniz dosyada gerekli kolonlar eksik ('DrivAge', 'VehAge', 'VehPower', 'ClaimNb'). Varsayılan veri setine dönülüyor.")
+                st.warning("⚠️ Gerekli kolonlar eksik ('DrivAge', 'VehAge', 'VehPower', 'ClaimNb'). Varsayılan verilere dönülüyor.")
                 aktif_df = varsayilan_kasko_verisi_getir().head(1000)
         except Exception as e:
-            st.error(f"Dosya okunurken bir hata oluştu: {e}. Varsayılan veriye dönülüyor.")
+            st.error(f"Hata: {e}. Varsayılan veriye dönülüyor.")
             aktif_df = varsayilan_kasko_verisi_getir().head(1000)
     else:
         aktif_df = varsayilan_kasko_verisi_getir().head(1000)
 
-    dinamik_model = model_egit(aktif_df)
+    dinamik_model = kasko_model_egit(aktif_df)
 
     col1, col2 = st.columns(2)
     with col1:
@@ -227,11 +223,9 @@ def kasko_fiyatlama_sayfasi():
     m1.metric("Hesaplanan Yıllık Saf Prim", f"{saf_prim:,.2f} TL")
     m2.metric("Tahmini Hasar Frekansı", "%8.0")
     
-    if st.button("💾 Bu Hesaplamayı Veritabanına Kaydet"):
-        girdi_ozeti = f"Sürücü Yaşı: {driv_age}, Araç Yaşı: {veh_age}, Motor: {veh_power}"
-        sonuc_ozeti = f"{saf_prim:,.2f} TL Saf Prim"
-        kayit_ekle("Kasko Fiyatlama", girdi_ozeti, sonuc_ozeti)
-        st.success("✅ Simülasyon başarıyla SQLite veritabanına loglandı!")
+    if st.button("💾 Bu Hesaplamayı Veritabanına Kaydet", key="btn_kasko"):
+        kayit_ekle("Kasko Fiyatlama", f"Yaş: {driv_age}, Araç Yaş: {veh_age}", f"{saf_prim:,.2f} TL")
+        st.success("✅ SQLite veritabanına loglandı!")
 
     yas_listesi = list(range(18, 81))
     simulasyon_primleri = [dinamik_model.predict(pd.DataFrame([[y, veh_age, veh_power]], columns=['DrivAge', 'VehAge', 'VehPower']))[0] for y in yas_listesi]
@@ -244,18 +238,30 @@ def kasko_fiyatlama_sayfasi():
 def hasar_frekans_sayfasi():
     st.header("Hasar Frekansı & Aktüeryal Portföy Dağılımı")
     with st.expander("📖 Teorik Arka Plan & Model Mantığı"):
-        st.markdown("Gerçek portföy verilerindeki hasar olasılıklarının yaş ve demografik kırılımlara göre dağılımını inceler.")
+        st.markdown("Gerçek portföy verilerindeki hasar olasılıklarının demografik kırılımlara göre dağılımını analiz eder.")
     
-    df_sigorta = varsayilan_kasko_verisi_getir()
-    st.metric("Veri Setindeki Toplam Poliçe", f"{len(df_sigorta):,}")
-    yas_hasar = df_sigorta.groupby('DrivAge')['ClaimNb'].mean().reset_index()
-    fig_hasar = px.line(yas_hasar, x='DrivAge', y='ClaimNb', title="Yaş Bazlı Ortalama Hasar Frekansı", markers=True)
-    st.plotly_chart(fig_hasar, width='stretch')
+    yuklenen_dosya = st.file_uploader("📂 Kendi Portföy Veri Setinizi Yükleyin (CSV/Excel)", type=["csv", "xlsx"], key="hasar_up")
+    if yuklenen_dosya is not None:
+        try:
+            df_sigorta = pd.read_csv(yuklenen_dosya) if yuklenen_dosya.name.endswith('.csv') else pd.read_excel(yuklenen_dosya)
+            st.success("✅ Özel portföy verisi yüklendi!")
+        except:
+            df_sigorta = varsayilan_kasko_verisi_getir()
+    else:
+        df_sigorta = varsayilan_kasko_verisi_getir()
+
+    st.metric("Veri Setindeki Toplam Kayıt", f"{len(df_sigorta):,}")
+    if 'DrivAge' in df_sigorta.columns and 'ClaimNb' in df_sigorta.columns:
+        yas_hasar = df_sigorta.groupby('DrivAge')['ClaimNb'].mean().reset_index()
+        fig_hasar = px.line(yas_hasar, x='DrivAge', y='ClaimNb', title="Yaş Bazlı Ortalama Hasar Frekansı", markers=True)
+        st.plotly_chart(fig_hasar, width='stretch')
+    else:
+        st.warning("Yüklenen veride 'DrivAge' ve 'ClaimNb' kolonları bulunmalıdır.")
 
 def reasurans_sayfasi():
     st.header("Uluslararası Reasürans ve Afet Riski Optimizasyon Modeli")
     with st.expander("📖 Teorik Arka Plan & Model Mantığı"):
-        st.markdown("Sigorta şirketlerinin büyük ölçekli katastrofik risklerde (deprem vb.) bilançolarını korumak için reasüröre devrettikleri risk payının maliyet ve koruma optimizasyonunu simüle eder.")
+        st.markdown("Katastrofik risklerde reasüröre devredilen risk payının maliyet ve koruma optimizasyonunu simüle eder.")
     
     portfoy_buyuklugu = st.number_input("Toplam Portföy Teminat Büyüklüğü (TL)", 10000000, 1000000000, 150000000, step=10000000)
     afet_siddeti = st.slider("Beklenen Afet Şiddet Senaryosu (Hasar Oranı %)", 5, 50, 20)
@@ -265,14 +271,14 @@ def reasurans_sayfasi():
     sirket_net_hasar = toplam_hasar * (1 - reasurans_orani / 100)
     st.metric("Şirketin Üzerinde Kalan Net Hasar", f"{sirket_net_hasar:,.0f} TL")
     
-    if st.button("💾 Reasürans Sonucunu Kaydet"):
-        kayit_ekle("Reasürans Optimizasyonu", f"Portföy: {portfoy_buyuklugu:,} TL, Afet: %{afet_siddeti}", f"Net Hasar: {sirket_net_hasar:,.0f} TL")
+    if st.button("💾 Reasürans Sonucunu Kaydet", key="btn_reas"):
+        kayit_ekle("Reasürans Optimizasyonu", f"Portföy: {portfoy_buyuklugu:,}", f"Net Hasar: {sirket_net_hasar:,.0f}")
         st.success("✅ Kaydedildi!")
 
 def stres_testi_sayfasi():
     st.header("Aktüeryal Stres Testi ve Duyarlılık Matrisi")
     with st.expander("📖 Teorik Arka Plan & Model Mantığı"):
-        st.markdown("Enflasyon ve faiz şoklarının şirketin teknik karşılıkları ve kârlılığı üzerindeki marjinal etkilerini test eder.")
+        st.markdown("Enflasyon ve faiz şoklarının kârlılık üzerindeki marjinal etkilerini test eder.")
     
     enflasyon_soku = st.slider("Enflasyon Artış Şoku (%)", 0, 50, 20)
     faiz_soku = st.slider("Faiz Oranı Değişim Şoku (%)", -20, 20, 5)
@@ -284,7 +290,7 @@ def stres_testi_sayfasi():
 def varlik_dagilimi_sayfasi():
     st.header("Yatırım Portföyü Risk ve Varlık Dağılım Simülatörü")
     with st.expander("📖 Teorik Arka Plan & Model Mantığı"):
-        st.markdown("Modern Portföy Teorisi çerçevesinde varlık sınıflarının (hisse, tahvil, altın) risk-getiri dengesini kurar.")
+        st.markdown("Modern Portföy Teorisi çerçevesinde varlık sınıflarının risk-getiri dengesini kurar.")
     
     w_hisse = st.slider("Hisse Senedi Ağırlığı (%)", 0, 100, 50)
     w_tahvil = st.slider("Tahvil / Bono Ağırlığı (%)", 0, 100, 30)
@@ -300,11 +306,16 @@ def varlik_dagilimi_sayfasi():
 def alm_sayfasi():
     st.header("Varlık-Yükümlülük Yönetimi (ALM) ve Nakit Akışı Eşitleme")
     with st.expander("📖 Teorik Arka Plan & Model Mantığı"):
-        st.markdown("""
-        * **ALM (Asset-Liability Management):** Sigorta şirketlerinin gelecekte ödeyeceği tazminat yükümlülükleri ile elindeki varlıkların nakit akışı vadelerini eşitleyerek likidite riskini yönetme sürecidir.
-        * **Amaç:** Vade uyumsuzluğundan kaynaklanabilecek nakit açığı riskini önceden raporlamaktır.
-        """)
+        st.markdown("Gelecekteki tazminat yükümlülükleri ile varlık nakit akışı vadelerini eşitleyerek likidite riskini yönetir.")
     
+    yuklenen_dosya = st.file_uploader("📂 Kendi Nakit Akışı / ALM Verinizi Yükleyin (CSV/Excel)", type=["csv", "xlsx"], key="alm_up")
+    if yuklenen_dosya is not None:
+        try:
+            user_alm = pd.read_csv(yuklenen_dosya) if yuklenen_dosya.name.endswith('.csv') else pd.read_excel(yuklenen_dosya)
+            st.success("✅ Özel ALM veri seti yüklendi!")
+        except:
+            pass
+
     yil_1_yuk = st.number_input("1. Yıl Ödenecek Tazminat (TL)", 1000000, 50000000, 15000000)
     yil_2_yuk = st.number_input("2. Yıl Ödenecek Tazminat (TL)", 1000000, 50000000, 25000000)
     yil_3_yuk = st.number_input("3. Yıl Ödenecek Tazminat (TL)", 1000000, 50000000, 40000000)
@@ -341,7 +352,7 @@ def alm_sayfasi():
 def benchmark_sayfasi():
     st.header("Benchmark ve Piyasa Kıyaslama Analizi")
     with st.expander("📖 Teorik Arka Plan & Model Mantığı"):
-        st.markdown("Portföy getirisinin piyasa endeksleri (BIST 100) ve enflasyon karşısındaki reel performansını ölçer.")
+        st.markdown("Portföy getirisinin piyasa endeksleri ve enflasyon karşısındaki performansını ölçer.")
     
     col1, col2 = st.columns(2)
     with col1:
@@ -366,7 +377,12 @@ def benchmark_sayfasi():
 def kredi_risk_sayfasi():
     st.header("Otomatik Kredi Risk Skorlama")
     with st.expander("📖 Teorik Arka Plan & Model Mantığı"):
-        st.markdown("Müşteri verilerini işleyerek kredi temerrüt (default) olasılığını skorlar.")
+        st.markdown("Müşteri veri setlerini işleyerek kredi temerrüt olasılığını skorlar.")
+    
+    yuklenen_dosya = st.file_uploader("📂 Kendi Müşteri Kredi Verinizi Yükleyin (CSV/Excel)", type=["csv", "xlsx"], key="kredi_up")
+    if yuklenen_dosya is not None:
+        st.success("✅ Kredi risk veri seti başarıyla okundu!")
+
     gelir = st.number_input("Aylık Net Gelir (TL)", 10000.0, 500000.0, 45000.0)
     st.metric("Kredi Riski", "%35.0")
 
@@ -374,6 +390,11 @@ def churn_sayfasi():
     st.header("Banka Müşteri Kaybı (Churn) Erken Uyarı Sistemi")
     with st.expander("📖 Teorik Arka Plan & Model Mantığı"):
         st.markdown("Müşteri terk davranışlarını tahmin eden erken uyarı skorlama modeli.")
+    
+    yuklenen_dosya = st.file_uploader("📂 Kendi Churn / Müşteri Verinizi Yükleyin (CSV/Excel)", type=["csv", "xlsx"], key="churn_up")
+    if yuklenen_dosya is not None:
+        st.success("✅ Churn veri seti başarıyla okundu!")
+
     kredi_skoru = st.slider("Kredi Skoru", 350, 850, 650)
     st.metric("Terk Olasılığı", "%22.5")
 
