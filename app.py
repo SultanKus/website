@@ -10,7 +10,55 @@ import sqlite3
 from datetime import datetime
 
 # ---------------------------------------------------------
-# VERİTABANI BAĞLANTISI (SQLite Yerel Veritabanı)
+# SAYFA YAPILANDIRMASI VE KURUMSAL CSS STİLİ
+# ---------------------------------------------------------
+st.set_page_config(
+    page_title="Sultan Kuş | Finansal Veri Bilimi & Aktüeryal Lab", 
+    page_icon="💼", 
+    layout="wide"
+)
+
+st.markdown("""
+    <style>
+    .stApp {
+        background-color: #f8f9fa;
+        font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    }
+    [data-testid="stSidebar"] {
+        background-color: #0b1f33;
+        color: #ffffff;
+    }
+    [data-testid="stSidebar"] .stMarkdown h1, [data-testid="stSidebar"] .stMarkdown h2, [data-testid="stSidebar"] .stMarkdown h3, [data-testid="stSidebar"] span {
+        color: #ffffff !important;
+    }
+    div.stMetric {
+        background-color: #ffffff;
+        padding: 15px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        border-left: 4px solid #0055a5;
+    }
+    h1, h2, h3 {
+        color: #0b1f33;
+        font-weight: 700;
+    }
+    .stButton>button {
+        background-color: #0055a5;
+        color: white;
+        border-radius: 6px;
+        border: none;
+        padding: 0.5rem 1rem;
+        font-weight: 600;
+    }
+    .stButton>button:hover {
+        background-color: #003d73;
+        color: white;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+# ---------------------------------------------------------
+# VERİTABANI BAĞLANTISI (SQLite)
 # ---------------------------------------------------------
 def veritabani_olustur():
     conn = sqlite3.connect('finansal_lab.db', check_same_thread=False)
@@ -21,7 +69,7 @@ def veritabani_olustur():
             tarih TEXT,
             modul_adi TEXT,
             girdi_detayi TEXT,
-             sonuc_deger TEXT
+            sonuc_deger TEXT
         )
     ''')
     conn.commit()
@@ -64,70 +112,18 @@ def kasko_modelini_yukle():
 
 kasko_model = kasko_modelini_yukle()
 
-# Sayfa Yapılandırması
-st.set_page_config(
-    page_title="Sultan Kuş | Finansal Veri Bilimi & Aktüeryal Lab", 
-    page_icon="💼", 
-    layout="wide"
-)
-
-# Başlık ve Üst Bilgi
-st.title("💼 Finansal Veri Bilimi & Aktüeryal Laboratuvarı")
-st.markdown("**Geliştirici:** Sultan Kuş | Matematik & Finansal Veri Bilimi")
-st.markdown("Bu platform; sigorta risk analitiği, bankacılık kredi ve müşteri kayıp (churn) skorlaması, portföy optimizasyonu, ALM, stres testleri, global reasürans modelleri ve **yerleşik veritabanı loglama altyapısını** tek çatı altında sunan kurumsal bir analitik laboratuvardır.")
-st.markdown("---")
-
-# Kenar Çubuğu (Profesyonel 3'lü Kategori ve Alt Modül Mimarisi)
-st.sidebar.title("🚀 Analitik Laboratuvarı")
-st.sidebar.markdown("---")
-
-kategori = st.sidebar.selectbox(
-    "Ana Kategori", 
-    [
-        "🚗 Sigorta & Aktüeryal Veri Analitiği", 
-        "📊 Yatırım & Portföy Veri Bilimi", 
-        "🤖 Finansal Tahminleme & ML Modelleri",
-        "📂 Veritabanı & Simülasyon Geçmişi",
-        "👩‍💻 Hakkımda & İletişim"
-    ]
-)
-
-if kategori == "🚗 Sigorta & Aktüeryal Veri Analitiği":
-    modul = st.sidebar.radio(
-        "Alt Modüller", 
-        [
-            "Kasko Saf Prim Fiyatlaması (ML)", 
-            "Hasar Frekans & Risk Profili",
-            "Uluslararası Reasürans & Afet Optimizasyonu",
-            "Aktüeryal Stres Testi (Duyarlılık)"
-        ]
-    )
-elif kategori == "📊 Yatırım & Portföy Veri Bilimi":
-    modul = st.sidebar.radio(
-        "Alt Modüller", 
-        [
-            "Varlık Dağılımı & Risk Simülatörü", 
-            "Varlık-Yükümlülük Yönetimi (ALM)",
-            "Benchmark & Enflasyon Kıyaslama"
-        ]
-    )
-elif kategori == "🤖 Finansal Tahminleme & ML Modelleri":
-    modul = st.sidebar.radio(
-        "Alt Modüller", 
-        [
-            "Otomatik Kredi Risk Skorlama", 
-            "Müşteri Kaybı (Churn) Erken Uyarı"
-        ]
-    )
-elif kategori == "📂 Veritabanı & Simülasyon Geçmişi":
-    modul = "Simülasyon Veritabanı Kayıtları"
-else:
-    modul = "👩‍💻 Hakkımda & İletişim"
-
 # ---------------------------------------------------------
-# MODÜL 1: KASKO SAF PRİM FİYATLAMASI
+# SAYFA FONKSİYONLARI (MODÜLLER)
 # ---------------------------------------------------------
-if modul == "Kasko Saf Prim Fiyatlaması (ML)":
+
+def ana_sayfa():
+    st.title("💼 Kurumsal Finansal Veri Bilimi & Aktüeryal Laboratuvarı")
+    st.markdown("**Geliştirici:** Sultan Kuş | Matematik & Finansal Veri Bilimi")
+    st.markdown("Sigorta risk analitiği, bankacılık kredi ve müşteri kayıp (churn) skorlaması, portföy optimizasyonu, ALM, stres testleri, global reasürans modelleri ve **yerleşik veritabanı loglama altyapısını** bir arada sunan analitik karar destek platformu.")
+    st.markdown("---")
+    st.info("👈 Sol menüden incelemek istediğiniz finansal veya aktüeryal modülü seçebilirsiniz.")
+
+def kasko_fiyatlama_sayfasi():
     st.header("🚗 Aktüeryal Kasko Saf Prim (Pure Premium) Fiyatlama Motoru")
     st.write("Açık kaynak gerçek sigorta veri setiyle eğitilmiş Makine Öğrenmesi Modeli üzerinden risk bazlı adil kasko primi hesaplayın.")
     
@@ -149,7 +145,6 @@ if modul == "Kasko Saf Prim Fiyatlaması (ML)":
     m1.metric("Hesaplanan Yıllık Saf Prim", f"{saf_prim:,.2f} TL")
     m2.metric("Tahmini Hasar Frekansı", "%8.0")
     
-    # Veritabanına Otomatik Kaydetme Butonu
     if st.button("💾 Bu Hesaplamayı Veritabanına Kaydet"):
         girdi_ozeti = f"Sürücü Yaşı: {driv_age}, Araç Yaşı: {veh_age}, Motor: {veh_power}"
         sonuc_ozeti = f"{saf_prim:,.2f} TL Saf Prim"
@@ -160,25 +155,19 @@ if modul == "Kasko Saf Prim Fiyatlaması (ML)":
     simulasyon_primleri = [kasko_model.predict(pd.DataFrame([[y, veh_age, veh_power]], columns=['DrivAge', 'VehAge', 'VehPower']))[0] for y in yas_listesi]
 
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=yas_listesi, y=simulasyon_primleri, mode='lines+markers', name='Model Tahmini Saf Prim', line=dict(color='#ff4b4b', width=3)))
+    fig.add_trace(go.Scatter(x=yas_listesi, y=simulasyon_primleri, mode='lines+markers', name='Model Tahmini Saf Prim', line=dict(color='#0055a5', width=3)))
     fig.update_layout(xaxis_title="Sürücü Yaşı", yaxis_title="Hesaplanan Saf Prim (TL)", template="plotly_white")
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width='stretch')
 
-# ---------------------------------------------------------
-# MODÜL 2: HASAR FREKANS & RİSK PROFİLİ
-# ---------------------------------------------------------
-elif modul == "Hasar Frekans & Risk Profili":
+def hasar_frekans_sayfasi():
     st.header("📈 Hasar Frekans & Aktüeryal Portföy Dağılımı")
     df_sigorta = gercek_kasko_verisini_getir()
     st.metric("Veri Setindeki Toplam Poliçe", f"{len(df_sigorta):,}")
     yas_hasar = df_sigorta.groupby('DrivAge')['ClaimNb'].mean().reset_index()
     fig_hasar = px.line(yas_hasar, x='DrivAge', y='ClaimNb', title="Yaş Bazlı Ortalama Hasar Frekansı", markers=True)
-    st.plotly_chart(fig_hasar, use_container_width=True)
+    st.plotly_chart(fig_hasar, width='stretch')
 
-# ---------------------------------------------------------
-# MODÜL 3: ULUSLARARASI REASÜRANS & AFET OPTİMİZASYONU
-# ---------------------------------------------------------
-elif modul == "Uluslararası Reasürans & Afet Optimizasyonu":
+def reasurans_sayfasi():
     st.header("🌐 Uluslararası Reasürans ve Afet Riski Optimizasyon Modeli")
     portfoy_buyuklugu = st.number_input("Toplam Portföy Teminat Büyüklüğü (TL)", 10000000, 1000000000, 150000000, step=10000000)
     afet_siddeti = st.slider("Beklenen Afet Şiddet Senaryosu (Hasar Oranı %)", 5, 50, 20)
@@ -192,10 +181,7 @@ elif modul == "Uluslararası Reasürans & Afet Optimizasyonu":
         kayit_ekle("Reasürans Optimizasyonu", f"Portföy: {portfoy_buyuklugu:,} TL, Afet: %{afet_siddeti}", f"Net Hasar: {sirket_net_hasar:,.0f} TL")
         st.success("✅ Kaydedildi!")
 
-# ---------------------------------------------------------
-# MODÜL 4: AKTÜERYAL STRES TESTİ VE DUYARLILIK MATRİSİ
-# ---------------------------------------------------------
-elif modul == "Aktüeryal Stres Testi (Duyarlılık)":
+def stres_testi_sayfasi():
     st.header("⚡ Aktüeryal Stres Testi ve Duyarlılık Matrisi")
     enflasyon_soku = st.slider("Enflasyon Artış Şoku (%)", 0, 50, 20)
     faiz_soku = st.slider("Faiz Oranı Değişim Şoku (%)", -20, 20, 5)
@@ -204,10 +190,7 @@ elif modul == "Aktüeryal Stres Testi (Duyarlılık)":
     simule_kar = baz_kar * (1 + (faiz_soku / 100) - (enflasyon_soku / 100) * 1.5)
     st.metric("Simüle Edilen Net Teknik Kâr / Zarar", f"{simule_kar:,.0f} TL")
 
-# ---------------------------------------------------------
-# MODÜL 5: VARLIK DAĞILIMI & RİSK SİMÜLATÖRÜ
-# ---------------------------------------------------------
-elif modul == "Varlık Dağılımı & Risk Simülatörü":
+def varlik_dagilimi_sayfasi():
     st.header("📈 Yatırım Portföyü Risk ve Varlık Dağılım Simülatörü")
     w_hisse = st.slider("Hisse Senedi Ağırlığı (%)", 0, 100, 50)
     w_tahvil = st.slider("Tahvil / Bono Ağırlığı (%)", 0, 100, 30)
@@ -216,12 +199,11 @@ elif modul == "Varlık Dağılımı & Risk Simülatörü":
     if w_hisse + w_tahvil + w_altin == 100:
         df_portfoy = pd.DataFrame({'Varlık Sınıfı': ['Hisse Senedi', 'Tahvil', 'Altın'], 'Ağırlık': [w_hisse, w_tahvil, w_altin]})
         fig_p = px.pie(df_portfoy, names='Varlık Sınıfı', values='Ağırlık', hole=0.4)
-        st.plotly_chart(fig_p, use_container_width=True)
+        st.plotly_chart(fig_p, width='stretch')
+    else:
+        st.warning("⚠️ Varlık ağırlıkları toplamı tam olarak %100 olmalıdır!")
 
-# ---------------------------------------------------------
-# MODÜL 6: VARLIK-YÜKÜMLÜLÜK YÖNETİMİ (ALM) & RAPOR İNDİRME
-# ---------------------------------------------------------
-elif modul == "Varlık-Yükümlülük Yönetimi (ALM)":
+def alm_sayfasi():
     st.header("⚖️ Varlık-Yükümlülük Yönetimi (ALM) ve Nakit Akışı Eşitleme")
     yil_1_yuk = st.number_input("1. Yıl Ödenecek Tazminat (TL)", 1000000, 50000000, 15000000)
     yil_2_yuk = st.number_input("2. Yıl Ödenecek Tazminat (TL)", 1000000, 50000000, 25000000)
@@ -230,7 +212,7 @@ elif modul == "Varlık-Yükümlülük Yönetimi (ALM)":
     varlik_tahvil = st.number_input("Sabit Getirili Tahvil Portföyü (TL)", 10000000, 100000000, 60000000)
         
     yillar = ['1. Yıl', '2. Yıl', '3. Yıl']
-    yukumlulukler = [yil_1_yuk, yil_2_yuk, yil_3_yuk]
+    yukumlulukler = [yil_1_yuk, yil_2_yuk,yil_3_yuk]
     varlik_getirileri = [varlik_tahvil * (faiz_orani / 100)] * 3
     net_pozisyon = [v - y for v, y in zip(varlik_getirileri, yukumlulukler)]
     
@@ -242,9 +224,8 @@ elif modul == "Varlık-Yükümlülük Yönetimi (ALM)":
     })
     
     fig_alm = px.bar(alm_df, x='Yıl', y=['Yükümlülük (Tazminat)', 'Varlık Nakit Girişi'], barmode='group', title="Yıllık Varlık ve Yükümlülük Nakit Akışı Eşleşmesi")
-    st.plotly_chart(fig_alm, use_container_width=True)
+    st.plotly_chart(fig_alm, width='stretch')
 
-    # Excel İndirme
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
         alm_df.to_excel(writer, sheet_name='ALM_Raporu', index=False)
@@ -257,18 +238,49 @@ elif modul == "Varlık-Yükümlülük Yönetimi (ALM)":
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 
-# ---------------------------------------------------------
-# YENİ MODÜL: VERİTABANI & SİMÜLASYON GEÇMİŞİ
-# ---------------------------------------------------------
-elif modul == "Simülasyon Veritabanı Kayıtları":
+def benchmark_sayfasi():
+    st.header("📊 Benchmark ve Piyasa Kıyaslama Analizi")
+    st.write("Yatırım portföyünüzün getirilerini piyasa endeksleri (BIST 100) ve enflasyon oranı ile kıyaslayın.")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        portfoy_getiri = st.slider("Portföy Yıllık Getirisi (%)", 0, 100, 35)
+    with col2:
+        enflasyon = st.slider("Yıllık Enflasyon Oranı (%)", 0, 80, 25)
+        
+    bist_getiri = 28.5  # Sabit piyasa referansı
+    
+    m1, m2, m3 = st.columns(3)
+    m1.metric("Portföy Getirisi", f"%{portfoy_getiri}")
+    m2.metric("BIST 100 Benchmark", f"%{bist_getiri}")
+    m3.metric("Reel Getiri (Enflasyon Arındırılmış)", f"%{portfoy_getiri - enflasyon}")
+    
+    # Karşılaştırma Grafiği
+    df_bench = pd.DataFrame({
+        'Varlık / Endeks': ['Portföyünüz', 'BIST 100 Endeksi', 'Enflasyon'],
+        'Getiri Oranı (%)': [portfoy_getiri, bist_getiri, enflasyon]
+    })
+    fig_b = px.bar(df_bench, x='Varlık / Endeks', y='Getiri Oranı (%)', color='Varlık / Endeks', title="Portföy vs Piyasa Benchmark Kıyaslaması")
+    st.plotly_chart(fig_b, width='stretch')
+
+def kredi_risk_sayfasi():
+    st.header("🤖 Otomatik Kredi Risk Skorlama")
+    gelir = st.number_input("Aylık Net Gelir (TL)", 10000.0, 500000.0, 45000.0)
+    st.metric("Kredi Riski", "%35.0")
+
+def churn_sayfasi():
+    st.header("🏦 Banka Müşteri Kaybı (Churn) Erken Uyarı Sistemi")
+    kredi_skoru = st.slider("Kredi Skoru", 350, 850, 650)
+    st.metric("Terk Olasılığı", "%22.5")
+
+def veritabani_sayfasi():
     st.header("📂 SQLite Veritabanı: Kayıtlı Simülasyon Geçmişi")
     st.write("Sistem üzerinde şimdiye kadar çalıştırılıp veritabanına loglanan tüm finansal simülasyon kayıtları:")
     
     df_gecmis = gecmisi_getir()
     if len(df_gecmis) > 0:
-        st.dataframe(df_gecmis, use_container_width=True)
+        st.dataframe(df_gecmis, width='stretch')
         
-        # Veritabanını Temizleme Butonu
         if st.button("🗑️ Veritabanı Geçmişini Temizle"):
             conn = sqlite3.connect('finansal_lab.db', check_same_thread=False)
             c = conn.cursor()
@@ -277,38 +289,43 @@ elif modul == "Simülasyon Veritabanı Kayıtları":
             conn.close()
             st.rerun()
     else:
-        st.info("Henüz veritabanına kaydedilmiş bir simülasyon bulunmuyor. Modüllerdeki '💾 Kaydet' butonlarını kullanabilirsiniz.")
+        st.info("Henüz veritabanına kaydedilmiş bir simülasyon bulunmuyor.")
 
-# ---------------------------------------------------------
-# BENCHMARK
-# ---------------------------------------------------------
-elif modul == "Benchmark & Enflasyon Kıyaslama":
-    st.header("📊 Benchmark ve Piyasa Kıyaslama Analizi")
-
-# ---------------------------------------------------------
-# KREDİ RİSK
-# ---------------------------------------------------------
-elif modul == "Otomatik Kredi Risk Skorlama":
-    st.header("🤖 Otomatik Kredi Risk Skorlama")
-    gelir = st.number_input("Aylık Net Gelir (TL)", 10000.0, 500000.0, 45000.0)
-    st.metric("Kredi Riski", "%35.0")
-
-# ---------------------------------------------------------
-# CHURN
-# ---------------------------------------------------------
-elif modul == "Müşteri Kaybı (Churn) Erken Uyarı":
-    st.header("🏦 Banka Müşteri Kaybı (Churn) Erken Uyarı Sistemi")
-    kredi_skoru = st.slider("Kredi Skoru", 350, 850, 650)
-    st.metric("Terk Olasılığı", "%22.5")
-
-# ---------------------------------------------------------
-# HAKKINDA & İLETİŞİM
-# ---------------------------------------------------------
-elif modul == "👩‍💻 Hakkımda & İletişim":
+def hakkinda_sayfasi():
     st.header("👩‍💻 Proje Sahibi & Portfolyo Vitrini")
     st.markdown("""
     Merhaba! Ben **Sultan Kuş**, İstanbul Üniversitesi Matematik mezunuyum. Veri bilimi, yapay zeka, finansal risk analitiği ve aktüerya alanlarında projeler geliştiriyorum.
     
-    Bu platform; teorik finans modellerini, açık kaynak veri setlerini, makine öğrenmesi algoritmalarını ve **yerleşik SQLite veritabanı yönetimini** tek çatı altında sunmaktadır.
+    Bu platform; teorik finans modellerini, açık kaynak veri setlerini, makine öğrenmesi algoritmalarını ve **yerleşik SQLite veritabanı yönetimini** kurumsal bir arayüz tasarım eşliğinde sunmaktadır.
     """)
     st.success("✨ Bu platform işe alım mülakatlarında teknik yetkinliği kanıtlamak amacıyla tasarlanmıştır.")
+
+# ---------------------------------------------------------
+# STREAMLIT MULTIPAGE NAVIGASYON YAPISI
+# ---------------------------------------------------------
+pg = st.navigation({
+    "Ana Sayfa": [
+        st.Page(ana_sayfa, title="Genel Bakış", icon="🏠")
+    ],
+    "Sigorta & Aktüeryal": [
+        st.Page(kasko_fiyatlama_sayfasi, title="Kasko Saf Prim Fiyatlama", icon="🚗"),
+        st.Page(hasar_frekans_sayfasi, title="Hasar Frekans & Risk", icon="📈"),
+        st.Page(reasurans_sayfasi, title="Reasürans & Afet Optimizasyonu", icon="🌐"),
+        st.Page(stres_testi_sayfasi, title="Aktüeryal Stres Testi", icon="⚡")
+    ],
+    "Yatırım & Portföy": [
+        st.Page(varlik_dagilimi_sayfasi, title="Varlık Dağılım Simülatörü", icon="🥧"),
+        st.Page(alm_sayfasi, title="Varlık-Yükümlülük Yönetimi (ALM)", icon="⚖️"),
+        st.Page(benchmark_sayfasi, title="Benchmark & Piyasa Kıyaslama", icon="📊")
+    ],
+    "ML & Finansal Skorlama": [
+        st.Page(kredi_risk_sayfasi, title="Kredi Risk Skorlama", icon="🤖"),
+        st.Page(churn_sayfasi, title="Müşteri Kaybı (Churn) Erken Uyarı", icon="🏦")
+    ],
+    "Sistem & İletişim": [
+        st.Page(veritabani_sayfasi, title="Simülasyon Veritabanı Geçmişi", icon="📂"),
+        st.Page(hakkinda_sayfasi, title="Hakkımda & İletişim", icon="👩‍💻")
+    ]
+})
+
+pg.run()
