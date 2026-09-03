@@ -160,23 +160,61 @@ def ibnr_sayfasi():
     st.header("IBNR (Chain Ladder) Muallak Hasar Rezervi Aracı")
     t1, t2, t3 = st.tabs(["📊 Uygulama Paneli", "📐 Kullanılan Matematiksel Model", "💼 İş Değeri"])
     with t1:
-        st.info("Hasar gelişim üçgeni verinizi yükleyerek (CSV/Excel) IBNR rezerv hesaplamasını başlatın.")
-        st.file_uploader("📂 Hasar Gelişim Üçgeni Yükle", type=["csv", "xlsx"], key="ibnr_up")
-        df_plot = pd.DataFrame({
-            'Gelişim Yılı': [1, 2, 3, 4],
-            'Kaza Yılı 1': [1000, 1500, 1750, 1800],
-            'Kaza Yılı 2': [1100, 1600, 1800, 1850],
-            'Kaza Yılı 3': [1050, 1450, 1600, 1650],
-            'Kaza Yılı 4': [1200, 1650, 1850, 1900]
-        })
+        st.info("Hasar gelişim üçgeni verinizi yükleyerek (CSV/Excel) IBNR rezerv hesaplamasını başlatın. Sol sütun 'Kaza Yılı' olmalıdır.")
+        yuklenen_dosya = st.file_uploader("📂 Hasar Gelişim Üçgeni Yükle", type=["csv", "xlsx"], key="ibnr_up")
+        
+        if yuklenen_dosya is not None:
+            if yuklenen_dosya.name.endswith('.csv'):
+                df = pd.read_csv(yuklenen_dosya, index_col=0)
+            else:
+                df = pd.read_excel(yuklenen_dosya, index_col=0)
+        else:
+            # Kullanıcı dosya yüklemezse gösterilecek varsayılan veri
+            df = pd.DataFrame({
+                'Gelisim_1': [5000, 5500, 6000, 6500, 7200],
+                'Gelisim_2': [7500, 8000, 8800, 9500, np.nan],
+                'Gelisim_3': [8500, 9200, 10000, np.nan, np.nan],
+                'Gelisim_4': [9000, 9800, np.nan, np.nan, np.nan],
+                'Gelisim_5': [9200, np.nan, np.nan, np.nan, np.nan]
+            }, index=['2019', '2020', '2021', '2022', '2023'])
+            
+        st.write("**Mevcut Hasar Üçgeni (Kümülatif)**")
+        st.dataframe(df)
+        
         if st.button("IBNR Rezervini Hesapla"):
-            st.metric("Hesaplanan Toplam IBNR Rezervi", "850,400.00 TL")
+            # GERÇEK CHAIN LADDER ALGORİTMASI
+            n = len(df)
+            f_factors = []
+            
+            # Gelişim Faktörlerini (Link Ratios) Hesapla
+            for j in range(n-1):
+                sum_y_j1 = df.iloc[:n-1-j, j+1].sum()
+                sum_y_j = df.iloc[:n-1-j, j].sum()
+                f = sum_y_j1 / sum_y_j if sum_y_j != 0 else 1
+                f_factors.append(f)
+                
+            # Alt Üçgeni Doldur (Projeksiyon)
+            df_proj = df.copy()
+            for i in range(1, n):
+                for j in range(n-i, n):
+                    df_proj.iloc[i, j] = df_proj.iloc[i, j-1] * f_factors[j-1]
+            
+            # Nihai Hasar ve IBNR Hesaplaması
+            nihai_hasar = df_proj.iloc[:, -1].sum()
+            odenen_hasar = np.nansum(np.diag(df.values[::-1])) # En güncel ödenenler diyagonali
+            ibnr = nihai_hasar - odenen_hasar
+            
+            st.metric("Hesaplanan Toplam IBNR Rezervi", f"{ibnr:,.2f} TL")
+            
+            # İnteraktif Plotly Grafiği
             fig = go.Figure()
-            for col in df_plot.columns[1:]:
-                fig.add_trace(go.Scatter(x=df_plot['Gelişim Yılı'], y=df_plot[col], mode='lines+markers', name=col))
-            fig.update_layout(title="Kaza Yıllarına Göre Hasar Gelişim Projeksiyonu", template="plotly_white")
+            for index, row in df_proj.iterrows():
+                fig.add_trace(go.Scatter(x=df_proj.columns, y=row, mode='lines+markers', name=str(index)))
+            fig.update_layout(title="Kaza Yıllarına Göre Hasar Gelişim Projeksiyonu", xaxis_title="Gelişim Yılı", yaxis_title="Kümülatif Hasar (TL)")
             st.plotly_chart(fig, width='stretch')
+            
     with t2:
+        st.markdown("Geçmiş kaza yıllarına ait kümülatif hasar ödemeleri kullanılarak hasar gelişim faktörleri (Link Ratios) hesaplanır.")
         st.latex(r"f_j = \frac{\sum_{i=1}^{n-j} C_{i, j+1}}{\sum_{i=1}^{n-j} C_{i, j}}")
     with t3:
         st.markdown("Bu rezerv modeli, şirketin bilançosundaki en büyük yükümlülük kalemini doğru tahmin ederek nakit akışı krizlerini önler ve yasal sermaye yeterliliği (Solvency) rasyolarının SEDDK regülasyonlarına tam uyum sağlamasında **kritik rol oynar.**")
