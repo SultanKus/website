@@ -128,7 +128,7 @@ def kasko_model_egit(df_egitim):
 # ANA SAYFA
 # ---------------------------------------------------------
 def ana_sayfa():
-    st.title("Kurumsal Finansal Veri Bilimi & Aktüeryal Laboratuvarı")
+    st.title("Finansal Veri Bilimi & Aktüeryal Laboratuvarı")
     st.markdown("**Geliştirici:** Sultan Kuş | Matematik & Finansal Veri Bilimi")
     st.markdown("---")
     
