@@ -161,10 +161,11 @@ def ibnr_sayfasi():
     t1, t2, t3 = st.tabs(["📊 Uygulama Paneli", "📐 Kullanılan Matematiksel Model", "💼 İş Değeri"])
     with t1:
         st.info("Hasar gelişim üçgeni verinizi yükleyerek (CSV/Excel) IBNR rezerv hesaplamasını başlatın. Sol sütun 'Kaza Yılı' olmalıdır.")
-        yuklenen_dosya = st.file_uploader("📂 Hasar Gelişim Üçgeni Yükle", type=["csv", "txt", "xlsx"], key="ibnr_up")
+        # Dosya yükleme kısmına 'txt' uzantısını da ekliyoruz
+        yuklenen_dosya = st.file_uploader("📂 Hasar Gelişim Üçgeni Yükle", type=["csv", "xlsx", "txt"], key="ibnr_up")
         
         if yuklenen_dosya is not None:
-            if yuklenen_dosya.name.endswith('.csv'):
+            if yuklenen_dosya.name.endswith('.csv') or yuklenen_dosya.name.endswith('.txt'):
                 df = pd.read_csv(yuklenen_dosya, index_col=0)
             else:
                 df = pd.read_excel(yuklenen_dosya, index_col=0)
