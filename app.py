@@ -14,7 +14,7 @@ import math
 # SAYFA YAPILANDIRMASI VE KURUMSAL CSS STİLİ
 # ---------------------------------------------------------
 st.set_page_config(
-    page_title="Sultan Kuş | Finansal Veri Bilimi & Aktüeryal Lab", 
+    page_title="Finansal Veri Bilimi & Aktüeryal Lab", 
     page_icon="💼", 
     layout="wide"
 )
@@ -128,18 +128,18 @@ def kasko_model_egit(df_egitim):
 # ANA SAYFA
 # ---------------------------------------------------------
 def ana_sayfa():
-    st.title("Finansal Veri Bilimi & Aktüeryal Laboratuvarı")
+    st.title("Kurumsal Finansal Veri Bilimi & Aktüeryal Laboratuvarı")
     st.markdown("**Geliştirici:** Sultan Kuş | Matematik & Finansal Veri Bilimi")
     st.markdown("---")
     
     st.markdown("""
-    ### 🏛️ Platform Vizyonu ve Mimari Yapı (Süper Platform)
+    ### 🏛️ Platform Vizyonu ve Kurumsal Mimari
     Bu platform; sigortacılık, risk yönetimi, varlık-yükümlülük yönetimi (ALM), katılım fonu analitiği, türev ürünler ve makine öğrenmesi alanlarındaki karmaşık matematiksel modelleri somutlaştırmak ve endüstriyel standartlarda simüle etmek amacıyla geliştirilmiştir. 
     
-    Tüm modüller, C-Level yöneticilerin ve karar alıcıların vizyonuna uygun olarak **3 Sekmeli (Tab) Mimari** ile tasarlanmıştır:
-    1. **📊 Analiz Paneli:** Dinamik CSV/Excel veri yükleme altyapısıyla interaktif hesaplamalar.
-    2. **📐 Matematiksel Metodoloji:** Modelin teorik altyapısı ve formülleri.
-    3. **💼 İş Değeri:** Algoritmanın sigorta ve finans şirketlerine sağladığı stratejik avantaj.
+    Tüm modüller, C-Level yöneticilerin, aktüerlerin ve karar alıcıların vizyonuna uygun olarak tasarlanmıştır:
+    1. **📊 Uygulama Paneli:** İnteraktif slider'lar ve anlık Plotly simülasyonları.
+    2. **📐 Kullanılan Matematiksel Model:** Saf matematiksel zarafet, LaTeX destekli formülasyonlar.
+    3. **💼 İş Değeri:** Algoritmanın sigorta ve finans şirketlerine sağladığı kurumsal ve stratejik avantaj.
     """)
     st.info("👈 Sol menüden toplam 16 ileri düzey aktüeryal ve finansal modülü inceleyebilirsiniz.")
 
@@ -149,7 +149,7 @@ def ana_sayfa():
 
 def ibnr_sayfasi():
     st.header("IBNR (Chain Ladder) Muallak Hasar Rezervi Aracı")
-    t1, t2, t3 = st.tabs(["📊 Analiz Paneli", "📐 Matematiksel Metodoloji", "💼 İş Değeri"])
+    t1, t2, t3 = st.tabs(["📊 Uygulama Paneli", "📐 Kullanılan Matematiksel Model", "💼 İş Değeri"])
     with t1:
         st.info("Hasar gelişim üçgeni verinizi yükleyerek (CSV/Excel) IBNR rezerv hesaplamasını başlatın.")
         st.file_uploader("📂 Hasar Gelişim Üçgeni Yükle", type=["csv", "xlsx"], key="ibnr_up")
@@ -172,11 +172,11 @@ def ibnr_sayfasi():
         st.markdown("Geçmiş kaza yıllarına ait kümülatif hasar ödemeleri kullanılarak hasar gelişim faktörleri (Link Ratios) hesaplanır.")
         st.latex(r"f_j = \frac{\sum_{i=1}^{n-j} C_{i, j+1}}{\sum_{i=1}^{n-j} C_{i, j}}")
     with t3:
-        st.markdown("* **Bilanço Doğruluğu:** Şirketin yükümlülüklerini güvence altına alır.\n* **Yasal Uyumluluk:** Düzenleyici regülasyonlara (SEDDK) uyum sağlar.")
+        st.markdown("Bu rezerv modeli, şirketin bilançosundaki en büyük yükümlülük kalemini doğru tahmin ederek nakit akışı krizlerini önler ve yasal sermaye yeterliliği (Solvency) rasyolarının SEDDK regülasyonlarına tam uyum sağlamasında **kritik rol oynar.**")
 
 def hayat_sigortasi_sayfasi():
     st.header("Hayat Sigortası ve Aktüeryal Anüite Fiyatlama Motoru")
-    t1, t2, t3 = st.tabs(["📊 Analiz Paneli", "📐 Matematiksel Metodoloji", "💼 İş Değeri"])
+    t1, t2, t3 = st.tabs(["📊 Uygulama Paneli", "📐 Kullanılan Matematiksel Model", "💼 İş Değeri"])
     with t1:
         col1, col2 = st.columns(2)
         with col1:
@@ -197,11 +197,11 @@ def hayat_sigortasi_sayfasi():
         st.markdown("Komütasyon fonksiyonları ve resmi yaşam tabloları kullanılarak bugünkü değer hesaplanır.")
         st.latex(r"A_x = \sum_{t=0}^{\infty} v^{t+1} \cdot _{t}p_x \cdot q_{x+t}")
     with t3:
-        st.markdown("* **Ürün Geliştirme:** Rekabetçi BES/Hayat ürünleri tasarlama.\n* **Risk Yönetimi:** Uzun ömür ve ölüm risklerinin doğru fiyatlanması.")
+        st.markdown("Uzun ömür (longevity) ve mortalite risklerinin matematiksel kesinlikle fiyatlanması, şirketin BES ve Hayat portföyünde kârlılığı maksimize ederken pazar payını agresif ancak güvenli bir şekilde büyütmesini sağlar.")
 
 def kasko_fiyatlama_sayfasi():
     st.header("Aktüeryal Kasko Saf Prim (Pure Premium) Fiyatlama Motoru")
-    t1, t2, t3 = st.tabs(["📊 Analiz Paneli", "📐 Matematiksel Metodoloji", "💼 İş Değeri"])
+    t1, t2, t3 = st.tabs(["📊 Uygulama Paneli", "📐 Kullanılan Matematiksel Model", "💼 İş Değeri"])
     with t1:
         yuklenen_dosya = st.file_uploader("📂 Kendi Kasko Veri Setinizi Yükleyin (CSV/Excel)", type=["csv", "xlsx"], key="kasko_up")
         aktif_df = varsayilan_kasko_verisi_getir().head(1000)
@@ -212,25 +212,27 @@ def kasko_fiyatlama_sayfasi():
             veh_power = st.slider("Araç Motor Gücü (VehPower)", 1, 15, 7)
         with c2:
             veh_age = st.slider("Araç Yaşı (VehAge)", 0, 20, 3)
-            bonus_malus = st.slider("Bonus-Malus", 50, 250, 100)
+            muafiyet = st.slider("Kasko Muafiyet Oranı (%)", 0, 15, 2)
             
         girdi_df = pd.DataFrame([[driv_age, veh_age, veh_power]], columns=['DrivAge', 'VehAge', 'VehPower'])
-        saf_prim = dinamik_model.predict(girdi_df)[0]
+        saf_prim = dinamik_model.predict(girdi_df)[0] * (1 - muafiyet/100) # Muafiyet anlık tepkisi
         st.metric("Hesaplanan Yıllık Saf Prim", f"{saf_prim:,.2f} TL")
         yas_listesi = list(range(18, 81))
-        sim_prim = [dinamik_model.predict(pd.DataFrame([[y, veh_age, veh_power]], columns=['DrivAge', 'VehAge', 'VehPower']))[0] for y in yas_listesi]
+        sim_prim = [dinamik_model.predict(pd.DataFrame([[y, veh_age, veh_power]], columns=['DrivAge', 'VehAge', 'VehPower']))[0] * (1 - muafiyet/100) for y in yas_listesi]
         fig = go.Figure(go.Scatter(x=yas_listesi, y=sim_prim, line=dict(color='#0055a5')))
-        fig.update_layout(title="Yaşa Göre Prim Dağılımı")
+        fig.update_layout(title="Yaşa ve Muafiyete Göre Prim Dağılımı", xaxis_title="Sürücü Yaşı", yaxis_title="Saf Prim (TL)")
         st.plotly_chart(fig, width='stretch')
     with t2:
-        st.markdown("Genelleştirilmiş Doğrusal Modeller (GLM) kullanılarak risk parametrelerine göre modelleme yapılır.")
+        st.markdown("Aktüeryal primlendirme, hasarın gerçekleşme sıklığı ile hasar başına düşen ortalama şiddetin çarpımından oluşur.")
+        st.latex(r"\text{Saf Prim} = \text{Hasar Frekansı} \times \text{Hasar Şiddeti}")
+        st.markdown("Genelleştirilmiş Doğrusal Modeller (GLM) bağ fonksiyonu (link function):")
         st.latex(r"E[Y] = \mu = g^{-1}(X\beta)")
     with t3:
-        st.markdown("* **Kârlılık:** Doğru sürücüye doğru fiyatı vererek anti-seleksiyonu önler.\n* **Pazar Payı:** Riskli gruplardan kaçınarak güvenli sürücüleri çeker.")
+        st.markdown("Bu kasko fiyatlama modeli, şirketin hasar/prim (Loss Ratio) oranını dengelemek için kritik rol oynar. Doğru sürücüye doğru risk primi atanarak anti-seleksiyon riski bertaraf edilir.")
 
 def hasar_frekans_sayfasi():
     st.header("Hasar Frekansı & Aktüeryal Portföy Dağılımı")
-    t1, t2, t3 = st.tabs(["📊 Analiz Paneli", "📐 Matematiksel Metodoloji", "💼 İş Değeri"])
+    t1, t2, t3 = st.tabs(["📊 Uygulama Paneli", "📐 Kullanılan Matematiksel Model", "💼 İş Değeri"])
     with t1:
         st.file_uploader("📂 Kendi Portföy Veri Setinizi Yükleyin", type=["csv", "xlsx"], key="hasar_up")
         df_sigorta = varsayilan_kasko_verisi_getir()
@@ -242,11 +244,11 @@ def hasar_frekans_sayfasi():
         st.markdown("Ampirik hasar frekansı, toplam ihbar sayısının toplam maruz kalınan süreye (exposure) bölümüdür.")
         st.latex(r"\text{Frekans} = \frac{\sum \text{Hasar Adedi}}{\sum \text{Poliçe Yılı}}")
     with t3:
-        st.markdown("* **Risk Segmentasyonu:** Hangi demografik grupların bilançoya yük olduğunu gösterir.\n* **Kampanya Yönetimi:** Pazarlama bütçelerinin düşük riskli gruplara yönlendirilmesini sağlar.")
+        st.markdown("Portföydeki toksik ve kârlı segmentlerin ayrıştırılması, pazarlama bütçelerinin düşük riskli müşteri kitlelerine (hedef kitle optimizasyonu) yönlendirilmesini sağlayarak kurumsal kârlılığı artırır.")
 
 def monte_carlo_sayfasi():
     st.header("Monte Carlo ile Toplu Hasar Simülatörü")
-    t1, t2, t3 = st.tabs(["📊 Analiz Paneli", "📐 Matematiksel Metodoloji", "💼 İş Değeri"])
+    t1, t2, t3 = st.tabs(["📊 Uygulama Paneli", "📐 Kullanılan Matematiksel Model", "💼 İş Değeri"])
     with t1:
         frekans = st.slider("Beklenen Hasar Sayısı (Poisson)", 100, 5000, 1000)
         siddet_mu = st.slider("Ortalama Hasar Şiddeti (Lognormal)", 5.0, 15.0, 9.0)
@@ -260,13 +262,13 @@ def monte_carlo_sayfasi():
             c2.metric("%99 VaR (İflas Riski Sınırı)", f"{np.percentile(sim_sonuclar, 99):,.0f} TL")
     with t2:
         st.markdown("Toplam hasar (Aggregate Loss), hasar sayısının ve şiddetinin rastgele simüle edilmesiyle bulunur.")
-        st.latex(r"S = \sum_{i=1}^{N} X_i")
+        st.latex(r"S = \sum_{i=1}^{N} X_i \quad (N \sim Poisson, X \sim Lognormal)")
     with t3:
-        st.markdown("* **İflas Olasılığı:** Beklenmedik şoklara karşı şirketin dayanıklılığını ölçer.\n* **Sermaye Planlaması:** Şirketin ne kadar nakit tutması gerektiğini belirler.")
+        st.markdown("Şirketin beklenmedik makro şoklara karşı taşıdığı iflas olasılığını (Ruin Probability) hesaplar. Sermaye planlaması ve uygun katmanda (layer) reasürans koruması alınması için hayati bir araçtır.")
 
 def stres_testi_sayfasi():
     st.header("Aktüeryal Stres Testi ve Duyarlılık Matrisi")
-    t1, t2, t3 = st.tabs(["📊 Analiz Paneli", "📐 Matematiksel Metodoloji", "💼 İş Değeri"])
+    t1, t2, t3 = st.tabs(["📊 Uygulama Paneli", "📐 Kullanılan Matematiksel Model", "💼 İş Değeri"])
     with t1:
         enflasyon_soku = st.slider("Enflasyon Artış Şoku (%)", 0, 50, 20)
         faiz_soku = st.slider("Faiz Oranı Değişim Şoku (%)", -20, 20, 5)
@@ -277,7 +279,7 @@ def stres_testi_sayfasi():
         st.markdown("Makroekonomik şokların şirket kârlılığı üzerindeki marjinal etkilerini (duyarlılık) belirler.")
         st.latex(r"\Delta \text{Kâr} = f(\Delta \text{Faiz}, \Delta \text{Enflasyon})")
     with t3:
-        st.markdown("* **Makro Risk Yönetimi:** Şirketi ekonomik krizlere hazırlar.\n* **Reasürans Bütçesi:** Şok dönemlerinde artacak hasar maliyetlerini planlamayı sağlar.")
+        st.markdown("Yönetim kurulunun ekonomik kriz senaryolarına karşı şirketin reasürans bütçesini ve likidite rezervlerini önceden planlamasına zemin hazırlar.")
 
 
 # =========================================================
@@ -286,7 +288,7 @@ def stres_testi_sayfasi():
 
 def katilim_fon_sayfasi():
     st.header("Katılım Emeklilik & Faizsiz Yatırım Fonları Takip Aracı")
-    t1, t2, t3 = st.tabs(["📊 Analiz Paneli", "📐 Matematiksel Metodoloji", "💼 İş Değeri"])
+    t1, t2, t3 = st.tabs(["📊 Uygulama Paneli", "📐 Kullanılan Matematiksel Model", "💼 İş Değeri"])
     with t1:
         st.file_uploader("📂 Kendi Fon Veri Setinizi Yükleyin (TEFAS/Excel)", type=["csv", "xlsx"], key="fon_up")
         tarihler = pd.date_range(start='2025-01-01', periods=60, freq='W')
@@ -305,11 +307,11 @@ def katilim_fon_sayfasi():
         st.markdown("Fonun dönemsel kümülatif büyümesi standart getiri formülüyle endekslenir.")
         st.latex(r"P_t = P_0 \prod_{i=1}^t (1 + R_i)")
     with t3:
-        st.markdown("* **Müşteri Çeşitliliği:** Faiz hassasiyeti olan demografik segmenti (İslami Finans) sisteme çeker.\n* **Fon Performansı:** BES katılımcılarına optimal varlık dağılımı sunar.")
+        st.markdown("Katılım esaslı fon yönetiminde şeffaflık sağlayarak faiz hassasiyeti yüksek bireysel emeklilik (BES) müşterilerinin sisteme dahil olmasını ve şirketin AUM (Yönetilen Varlık) büyüklüğünü artırmasını sağlar.")
 
 def alm_nakit_sayfasi():
     st.header("ALM (Varlık-Yükümlülük Yönetimi) Nakit Akışı Eşitleme")
-    t1, t2, t3 = st.tabs(["📊 Analiz Paneli", "📐 Matematiksel Metodoloji", "💼 İş Değeri"])
+    t1, t2, t3 = st.tabs(["📊 Uygulama Paneli", "📐 Kullanılan Matematiksel Model", "💼 İş Değeri"])
     with t1:
         st.file_uploader("📂 Nakit Akışı Verinizi Yükleyin", type=["csv", "xlsx"], key="alm_cash_up")
         yil_1_yuk = st.number_input("1. Yıl Tazminat Yükü (TL)", 1000000, 50000000, 15000000)
@@ -325,13 +327,13 @@ def alm_nakit_sayfasi():
         st.plotly_chart(fig_alm, width='stretch')
     with t2:
         st.markdown("Gelecek nakit çıkışları, varlıkların kupon ödemeleriyle (cash flow matching) eşitlenir.")
-        st.latex(r"CF_{Asset, t} \ge CF_{Liability, t}")
+        st.latex(r"CF_{\text{Varlık}, t} \ge CF_{\text{Yükümlülük}, t}")
     with t3:
-        st.markdown("* **Likidite Güvencesi:** Tazminat ödemeleri geldiğinde şirketin nakit krizine girmesini engeller.")
+        st.markdown("Kurumsal likidite krizlerini kökünden çözer. Tazminat yükümlülüklerinin vade tarihlerinde, şirketin elinde o tazminatı ödeyecek hazır ve risksiz nakit bulunmasını garanti altına alır.")
 
 def alm_durasyon_sayfasi():
     st.header("ALM Durasyon (Faiz Hassasiyeti) Eşleştirme Simülatörü")
-    t1, t2, t3 = st.tabs(["📊 Analiz Paneli", "📐 Matematiksel Metodoloji", "💼 İş Değeri"])
+    t1, t2, t3 = st.tabs(["📊 Uygulama Paneli", "📐 Kullanılan Matematiksel Model", "💼 İş Değeri"])
     with t1:
         f_orani = st.slider("Piyasa Faiz Oranı Şoku (%)", -5.0, 5.0, 0.0)
         d_varlik, d_yuk = 4.5, 6.2
@@ -346,11 +348,11 @@ def alm_durasyon_sayfasi():
         st.markdown("Macaulay Durasyonu, nakit akışlarının ağırlıklı ortalama vadesini ölçer.")
         st.latex(r"D_{Mac} = \frac{\sum_{t=1}^{T} \frac{t \cdot CF_t}{(1+y)^t}}{\sum_{t=1}^{T} \frac{CF_t}{(1+y)^t}}")
     with t3:
-        st.markdown("* **Faiz Riski Koruması:** Bilançoyu faiz oranlarındaki ani dalgalanmalara karşı bağışık (immunized) hale getirir.")
+        st.markdown("Varlık ve yükümlülüklerin durasyonlarını eşitleyerek bilançoyu (immunization) faiz oranlarındaki yıkıcı dalgalanmalara karşı kurşungeçirmez hale getirir.")
 
 def markowitz_sayfasi():
     st.header("Markowitz Modern Portföy Teorisi & Etkin Sınır (Efficient Frontier)")
-    t1, t2, t3 = st.tabs(["📊 Analiz Paneli", "📐 Matematiksel Metodoloji", "💼 İş Değeri"])
+    t1, t2, t3 = st.tabs(["📊 Uygulama Paneli", "📐 Kullanılan Matematiksel Model", "💼 İş Değeri"])
     with t1:
         if st.button("1000 Rastgele Portföy Simüle Et"):
             np.random.seed(42)
@@ -364,11 +366,11 @@ def markowitz_sayfasi():
         st.markdown("Portföy varyansı, varlıkların ağırlıkları ve kovaryans matrisi ile hesaplanır.")
         st.latex(r"\sigma_p^2 = \sum_{i} \sum_{j} w_i w_j Cov(R_i, R_j)")
     with t3:
-        st.markdown("* **Getiri Maksimizasyonu:** Şirket varlıklarını minimum riskle en yüksek getiriyi verecek şekilde dağıtır.")
+        st.markdown("Sigorta ve yatırım şirketlerinin tröst ettiği devasa fonları, bilimsel bir yaklaşımla minimum riskle maksimum getiriyi (Sharpe Optimizasyonu) sağlayacak şekilde çeşitlendirir.")
 
 def varlik_dagilimi_sayfasi():
     st.header("Yatırım Portföyü Risk ve Basit Varlık Dağılım Simülatörü")
-    t1, t2, t3 = st.tabs(["📊 Analiz Paneli", "📐 Matematiksel Metodoloji", "💼 İş Değeri"])
+    t1, t2, t3 = st.tabs(["📊 Uygulama Paneli", "📐 Kullanılan Matematiksel Model", "💼 İş Değeri"])
     with t1:
         w_hisse = st.slider("Hisse Senedi (%)", 0, 100, 50)
         w_tahvil = st.slider("Tahvil (%)", 0, 100, 30)
@@ -382,11 +384,11 @@ def varlik_dagilimi_sayfasi():
         st.markdown("Ağırlıkların toplamı 1'e eşit olacak şekilde portföy kısıtları belirlenir.")
         st.latex(r"\sum_{i=1}^{n} w_i = 1")
     with t3:
-        st.markdown("* **Çeşitlendirme (Diversification):** Bireysel yatırımcıların (BES) fonlarını görselleştirerek risk algısını yönetir.")
+        st.markdown("Bireysel yatırımcıların (BES) fonlarını görselleştirerek risk algısını yönetir ve perakende seviyesinde finansal okuryazarlığı artırarak müşteri sadakatini (retention) yükseltir.")
 
 def benchmark_sayfasi():
     st.header("Benchmark ve Piyasa Kıyaslama (BIST 100 / Enflasyon)")
-    t1, t2, t3 = st.tabs(["📊 Analiz Paneli", "📐 Matematiksel Metodoloji", "💼 İş Değeri"])
+    t1, t2, t3 = st.tabs(["📊 Uygulama Paneli", "📐 Kullanılan Matematiksel Model", "💼 İş Değeri"])
     with t1:
         c1, c2 = st.columns(2)
         with c1: portfoy_getiri = st.slider("Portföy Yıllık Getirisi (%)", 0, 100, 35)
@@ -395,10 +397,10 @@ def benchmark_sayfasi():
         df_bench = pd.DataFrame({'Endeks': ['Portföy', 'BIST 100', 'Enflasyon'], 'Getiri (%)': [portfoy_getiri, 28.5, enflasyon]})
         st.plotly_chart(px.bar(df_bench, x='Endeks', y='Getiri (%)', color='Endeks'), width='stretch')
     with t2:
-        st.markdown("Reel getiri, nominal getiriden enflasyon oranının arındırılmasıyla elde edilir (Fisher Denklemi Yaklaşımı).")
+        st.markdown("Reel getiri, nominal getiriden enflasyon oranının arındırılmasıyla elde edilir (Fisher Denklemi).")
         st.latex(r"R_{reel} = \frac{1 + R_{nominal}}{1 + R_{enflasyon}} - 1")
     with t3:
-        st.markdown("* **Performans Ölçümü:** Fon yöneticilerinin piyasayı yenip yenemediğini şeffafça ortaya koyar.")
+        st.markdown("Fon yöneticilerinin piyasayı yenip yenemediğini şeffafça ortaya koyar, yönetim performansını değerlendirmede endüstriyel bir kıyas kriteri (KPI) olarak çalışır.")
 
 # =========================================================
 # 3. GRUP: FİNANSAL MÜHENDİSLİK & RİSK
@@ -406,7 +408,7 @@ def benchmark_sayfasi():
 
 def solvency_sayfasi():
     st.header("Solvency II Sermaye Yeterliliği Hesaplayıcı (BSCR)")
-    t1, t2, t3 = st.tabs(["📊 Analiz Paneli", "📐 Matematiksel Metodoloji", "💼 İş Değeri"])
+    t1, t2, t3 = st.tabs(["📊 Uygulama Paneli", "📐 Kullanılan Matematiksel Model", "💼 İş Değeri"])
     with t1:
         mkt_risk = st.number_input("Piyasa Riski (MKT) - TL", 1000000, 50000000, 15000000)
         def_risk = st.number_input("Kredi / Temerrüt Riski (DEF) - TL", 1000000, 50000000, 5000000)
@@ -418,11 +420,11 @@ def solvency_sayfasi():
         st.markdown("Alt risk modülleri, Solvency II korelasyon matrisi ile birleştirilir.")
         st.latex(r"BSCR = \sqrt{ \sum_i \sum_j Corr_{i,j} \cdot SCR_i \cdot SCR_j }")
     with t3:
-        st.markdown("* **Yasal Zorunluluk:** Otoritenin (SEDDK) sermaye yeterliliği şartını korur, şirketi kapatılmaktan kurtarır.")
+        st.markdown("Otoritenin (SEDDK ve EIOPA) yasal sermaye yeterliliği şartlarını koruyarak şirketi lisans iptallerinden kurtarır ve rasyonel bir risk yönetimi kültürü inşa eder.")
 
 def reasurans_sayfasi():
     st.header("Dinamik Reasürans ve Kotpar / Eksedan Optimizasyonu")
-    t1, t2, t3 = st.tabs(["📊 Analiz Paneli", "📐 Matematiksel Metodoloji", "💼 İş Değeri"])
+    t1, t2, t3 = st.tabs(["📊 Uygulama Paneli", "📐 Kullanılan Matematiksel Model", "💼 İş Değeri"])
     with t1:
         brut_hasar = st.slider("Beklenen Afet Hasarı (Milyon TL)", 10, 500, 150)
         retention = st.slider("Şirketin Net Saklama Payı (Retention) (Milyon TL)", 1, 100, 25)
@@ -435,18 +437,21 @@ def reasurans_sayfasi():
         st.markdown("Eksedan (Surplus) anlaşmalarında, saklama payını aşan kısım reasüröre devredilir.")
         st.latex(r"\text{Reasürör Payı} = \max(0, \text{Brüt Hasar} - \text{Saklama Payı})")
     with t3:
-        st.markdown("* **Katastrofik Koruma:** Büyük afetlerde bilançonun çökmesini (ruin) engeller.")
+        st.markdown("Büyük deprem veya sel felaketleri (katastrofik riskler) karşısında reasürans (sigortanın sigortası) optimizasyonu yaparak şirketin iflas etmesini matematiksel olarak imkansız hale getirir.")
 
 def black_scholes_sayfasi():
     st.header("Black-Scholes Opsiyon Fiyatlama & Volatilite Modülü")
-    t1, t2, t3 = st.tabs(["📊 Analiz Paneli", "📐 Matematiksel Metodoloji", "💼 İş Değeri"])
+    t1, t2, t3 = st.tabs(["📊 Uygulama Paneli", "📐 Kullanılan Matematiksel Model", "💼 İş Değeri"])
     with t1:
-        S = st.number_input("Spot Fiyat (S)", 10.0, 1000.0, 100.0)
-        K = st.number_input("Kullanım Fiyatı (K)", 10.0, 1000.0, 100.0)
-        T = st.slider("Vade (Yıl)", 0.05, 5.0, 1.0)
-        r = st.slider("Faiz Oranı (%)", 1.0, 50.0, 15.0) / 100.0
-        sigma = st.slider("Volatilite (%)", 5.0, 100.0, 25.0) / 100.0
-        opt_tipi = st.selectbox("Opsiyon Tipi", ["Call (Alım)", "Put (Satım)"])
+        c1, c2 = st.columns(2)
+        with c1:
+            S = st.number_input("Spot Fiyat (S)", 10.0, 1000.0, 100.0)
+            K = st.number_input("Kullanım Fiyatı (K)", 10.0, 1000.0, 100.0)
+            T = st.slider("Vade (Yıl)", 0.05, 5.0, 1.0)
+        with c2:
+            r = st.slider("Faiz Oranı (%)", 1.0, 50.0, 15.0) / 100.0
+            sigma = st.slider("Volatilite (%)", 5.0, 100.0, 25.0) / 100.0
+            opt_tipi = st.selectbox("Opsiyon Tipi", ["Call (Alım)", "Put (Satım)"])
         
         d1 = (np.log(S / K) + (r + 0.5 * sigma**2) * T) / (sigma * np.sqrt(T))
         d2 = d1 - sigma * np.sqrt(T)
@@ -456,14 +461,16 @@ def black_scholes_sayfasi():
         fiyat = S * norm_cdf(d1) - K * np.exp(-r * T) * norm_cdf(d2) if opt_tipi == "Call (Alım)" else K * np.exp(-r * T) * norm_cdf(-d2) - S * norm_cdf(-d1)
         st.metric("Teorik Opsiyon Primi", f"{fiyat:,.2f} TL")
     with t2:
-        st.markdown("Finansal opsiyonların (Türev Ürünler) teorik değerini belirleyen kısmi diferansiyel denklemdir.")
-        st.latex(r"C(S,t) = S_t N(d_1) - K e^{-rt} N(d_2)")
+        st.markdown("Finansal opsiyonların (Türev Ürünler) teorik değerini belirleyen kısmi diferansiyel denklemin çözümüdür.")
+        st.latex(r"d_1 = \frac{\ln(S/K) + (r + \sigma^2 / 2)T}{\sigma \sqrt{T}}")
+        st.latex(r"d_2 = d_1 - \sigma \sqrt{T}")
+        st.latex(r"C = S_t N(d_1) - K e^{-rT} N(d_2)")
     with t3:
-        st.markdown("* **Risk Hedging (Korunma):** Döviz veya hisse senedi portföylerindeki riskleri türev ürünlerle (opsiyon) sıfırlar.")
+        st.markdown("Kurumsal hazine departmanları için bir Risk Hedging (Korunma) aracıdır. Döviz veya hisse senedi portföylerindeki piyasa risklerini türev ürünlerle (opsiyon) kompanse eder.")
 
 def kredi_var_sayfasi():
     st.header("Kredi Portföyü VaR (Value at Risk) Hesaplayıcı")
-    t1, t2, t3 = st.tabs(["📊 Analiz Paneli", "📐 Matematiksel Metodoloji", "💼 İş Değeri"])
+    t1, t2, t3 = st.tabs(["📊 Uygulama Paneli", "📐 Kullanılan Matematiksel Model", "💼 İş Değeri"])
     with t1:
         portfoy = st.number_input("Toplam Kredi Portföyü (TL)", 1000000, 1000000000, 50000000)
         guven_araligi = st.selectbox("Güven Aralığı", ["%95 (1.65 z)", "%99 (2.33 z)"])
@@ -475,7 +482,7 @@ def kredi_var_sayfasi():
         st.markdown("Parametrik VaR, portföyün normal dağılıma sahip olduğu varsayımıyla hesaplanır.")
         st.latex(r"VaR = V_p \cdot z_{\alpha} \cdot \sigma_p \cdot \sqrt{T}")
     with t3:
-        st.markdown("* **Risk İştahı:** Yönetim kurulunun maksimum tahammül edebileceği zararı matematiksel olarak sınırlandırır.")
+        st.markdown("Yönetim kurulunun risk iştahını belirler ve şirketin belirli bir periyotta tahammül edebileceği maksimum finansal zararı endüstri standardı bir metriğe bağlar.")
 
 # =========================================================
 # 4. GRUP: YAPAY ZEKA, INSURTECH & SKORLAMA
@@ -483,7 +490,7 @@ def kredi_var_sayfasi():
 
 def fraud_sayfasi():
     st.header("Makine Öğrenmesi ile Hasar Suistimali (Fraud) Uyarı Sistemi")
-    t1, t2, t3 = st.tabs(["📊 Analiz Paneli", "📐 Matematiksel Metodoloji", "💼 İş Değeri"])
+    t1, t2, t3 = st.tabs(["📊 Uygulama Paneli", "📐 Kullanılan Matematiksel Model", "💼 İş Değeri"])
     with t1:
         hasar_saati = st.slider("Hasar Saati (0-24)", 0, 24, 2)
         police_yasi = st.slider("Poliçe Yaşı (Gün)", 1, 365, 10)
@@ -494,11 +501,11 @@ def fraud_sayfasi():
         st.markdown("Lojistik Regresyon ile şüpheli bağımsız değişkenlerden olasılık çıkarılır.")
         st.latex(r"P(Y=1) = \frac{1}{1 + e^{-(\beta_0 + \beta_1 X_1 + \dots)}}")
     with t3:
-        st.markdown("* **Maliyet Tasarrufu:** Sahte hasar ödemelerini engeller.\n* **Operasyonel Hız:** Temiz dosyaları otomatik onaylar, şüphelileri eksperlere yönlendirir.")
+        st.markdown("Bu ML modeli, sahte (fraud) hasar ödemelerini proaktif olarak durdurarak şirkete devasa maliyet tasarrufu sağlar. Temiz dosyaları otomatik (fast-track) ödeyerek operasyonel yükü hafifletir.")
 
 def telematik_sayfasi():
     st.header("Telematik Tabanlı Sürücü Risk Skorlama (PAYD)")
-    t1, t2, t3 = st.tabs(["📊 Analiz Paneli", "📐 Matematiksel Metodoloji", "💼 İş Değeri"])
+    t1, t2, t3 = st.tabs(["📊 Uygulama Paneli", "📐 Kullanılan Matematiksel Model", "💼 İş Değeri"])
     with t1:
         ani_fren = st.slider("Aylık Ani Fren Sayısı", 0, 50, 12)
         gece_surus = st.slider("Gece Sürüş Oranı (%)", 0, 100, 45)
@@ -507,39 +514,39 @@ def telematik_sayfasi():
         st.info(f"Kasko Prim Etkisi: **{'%20 İndirim' if skor > 75 else '%15 Sürprim'}**")
     with t2:
         st.markdown("Sürücü davranışları ağırlıklandırılarak kasko primine yansıtılır (Pay How You Drive).")
-        st.latex(r"Score = 100 - (\sum w_i \cdot x_i)")
+        st.latex(r"\text{Sürüş Skoru} = 100 - \left(\sum_{i=1}^{n} w_i \cdot X_i\right)")
     with t3:
-        st.markdown("* **Fiyatlama Doğruluğu:** Sürücüleri yaşlarına göre değil *gerçek sürüş performanslarına* göre fiyatlar.")
+        st.markdown("İnsurTech dönüşümünün merkezindedir. Sürücüleri yaş/cinsiyet genellemeleri yerine 'gerçek kullanım verileriyle' adil şekilde fiyatlandırarak düşük riskli müşteri portföyü yaratır.")
 
 def kredi_risk_sayfasi():
     st.header("Otomatik Kredi Risk Skorlama Modülü")
-    t1, t2, t3 = st.tabs(["📊 Analiz Paneli", "📐 Matematiksel Metodoloji", "💼 İş Değeri"])
+    t1, t2, t3 = st.tabs(["📊 Uygulama Paneli", "📐 Kullanılan Matematiksel Model", "💼 İş Değeri"])
     with t1:
         st.file_uploader("📂 Müşteri Kredi Verinizi Yükleyin", type=["csv", "xlsx"], key="kredi_up")
         gelir = st.number_input("Aylık Net Gelir (TL)", 10000.0, 500000.0, 45000.0)
         st.metric("Temerrüt (Default) Olasılığı", "%35.0")
     with t2:
-        st.markdown("Temerrüt olasılığı (PD - Probability of Default) makine öğrenmesi algoritmalarıyla hesaplanır.")
-        st.latex(r"PD = f(\text{Gelir}, \text{Borç}, \text{Geçmiş Ödemeler})")
+        st.markdown("Temerrüt olasılığı (PD - Probability of Default) makine öğrenmesi sınıflandırma algoritmalarıyla hesaplanır.")
+        st.latex(r"PD = P(\text{Default}=1 | \text{Gelir, Borç Oranı})")
     with t3:
-        st.markdown("* **Batık Kredi (NPL) Yönetimi:** Kredi verilecek doğru müşterileri seçerek banka/finansman şirketinin zararını minimize eder.")
+        st.markdown("Batık kredi (NPL - Non-Performing Loans) oranlarını minimize eder. Finansal kurumlarda kredibilitesi yüksek müşterileri hızlıca onaylayarak kredi hacmini kârlı bir şekilde büyütür.")
 
 def churn_sayfasi():
     st.header("Banka/Sigorta Müşteri Kaybı (Churn) Erken Uyarı Sistemi")
-    t1, t2, t3 = st.tabs(["📊 Analiz Paneli", "📐 Matematiksel Metodoloji", "💼 İş Değeri"])
+    t1, t2, t3 = st.tabs(["📊 Uygulama Paneli", "📐 Kullanılan Matematiksel Model", "💼 İş Değeri"])
     with t1:
         st.file_uploader("📂 Churn Verinizi Yükleyin", type=["csv", "xlsx"], key="churn_up")
         kredi_skoru = st.slider("Kredi Skoru", 350, 850, 650)
         st.metric("Terk (Churn) Olasılığı", "%22.5")
     with t2:
-        st.markdown("Müşterinin şirketi terk edip etmeyeceğini sınıflandırma (Classification) modelleri ile tespit eder.")
-        st.latex(r"Churn = \text{Model}(X_{\text{Müşteri Davranışı}})")
+        st.markdown("Müşterinin şirketi terk edip etmeyeceğini tespit etmek için Karar Ağaçları veya Gradient Boosting algoritmaları kullanılır.")
+        st.latex(r"P(\text{Churn}=1) = f(X_{\text{Müşteri Davranışı}})")
     with t3:
-        st.markdown("* **Müşteri Elde Tutma (Retention):** Yeni müşteri bulma maliyetinden (CAC) tasarruf etmek için mevcut kârlı müşterileri elde tutar.")
+        st.markdown("Müşteri elde tutma (Retention) oranlarını artırır. Yeni bir müşteri kazanma maliyeti (CAC), mevcut müşteriyi tutmaktan katbekat yüksek olduğundan doğrudan kurum kârlılığına hizmet eder.")
 
 def clv_sayfasi():
     st.header("Müşteri Yaşam Boyu Değeri (CLV) Tahminleme Modeli")
-    t1, t2, t3 = st.tabs(["📊 Analiz Paneli", "📐 Matematiksel Metodoloji", "💼 İş Değeri"])
+    t1, t2, t3 = st.tabs(["📊 Uygulama Paneli", "📐 Kullanılan Matematiksel Model", "💼 İş Değeri"])
     with t1:
         ortalama_sepet = st.number_input("Ortalama Poliçe / İşlem Tutarı (TL)", 500.0, 50000.0, 4500.0)
         yillik_islem = st.slider("Yıllık Ortalama İşlem Sayısı", 1, 12, 2)
@@ -550,9 +557,9 @@ def clv_sayfasi():
         st.metric("Ortalama Müşteri Yaşam Boyu Değeri (CLV)", f"{clv_deger:,.2f} TL")
     with t2:
         st.markdown("Bir müşterinin şirketle ticari ilişkisi boyunca kazandıracağı net bugünkü değeri ifade eder.")
-        st.latex(r"CLV = (\text{Ort. Satın Alma} \times \text{Frekans} \times \text{Ömür}) \times \text{Kâr Marjı}")
+        st.latex(r"CLV = (\text{Ort. Harcama} \times \text{Alışveriş Sıklığı} \times \text{Müşteri Ömrü}) \times \text{Kâr Marjı}")
     with t3:
-        st.markdown("* **Pazarlama ROI Optimizasyonu:** Hangi müşteriye ne kadar pazarlama/promosyon bütçesi ayrılması gerektiğini bilimselleştirir.")
+        st.markdown("Şirketin pazarlama bütçesi ROI (Yatırım Getirisi) optimizasyonunu sağlar. Hangi müşteri segmentine ne kadar promosyon bütçesi harcanacağını bilimselleştirerek atıl harcamaları keser.")
 
 # =========================================================
 # 5. GRUP: SİSTEM & İLETİŞİM
@@ -577,7 +584,7 @@ def veritabani_sayfasi():
 def hakkinda_sayfasi():
     st.header("Proje Sahibi & Portfolyo Vitrini")
     st.markdown("""
-    Merhaba! Ben **Sultan Kuş**, İstanbul Üniversitesi Matematik mezunuyum. 
+    Merhaba! Ben **Sultan Kuş**, matematik mezunu bir analistim. 
     Veri bilimi, finansal risk analitiği, aktüerya ve yapay zeka alanlarında uçtan uca karar destek sistemleri geliştiriyorum.
     
     Bu Süper Platform; teorik matematik ve makine öğrenmesi modellerinin, kurumsal finans ve sigorta dünyasındaki gerçek iş süreçlerine nasıl değer kattığını (Business Value) kanıtlayan profesyonel bir vitrindir.
