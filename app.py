@@ -9,7 +9,7 @@ import sqlite3
 from datetime import datetime
 
 # ---------------------------------------------------------
-# SAYFA YAPILANDIRMASI VE CSS STİLİ
+# SAYFA YAPILANDIRMASI VE KURUMSAL CSS STİLİ
 # ---------------------------------------------------------
 st.set_page_config(
     page_title="Finansal Veri Bilimi & Aktüeryal Lab", 
@@ -21,35 +21,26 @@ st.set_page_config(
 st.markdown("""
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-    /* ========================================================
-       MOBİL BEYAZ EKRAN VE GÖRÜNMEYEN YAZI ÇÖZÜMÜ
-       ======================================================== */
-    .block-container {
+    /* Mobildeki beyaz ekran (görünmeyen yazı) sorunu için eklendi */
+    .stApp, .stApp p, .stApp span, .stApp div, .stApp label, .stApp li {
         color: #0b1f33 !important;
     }
-    .block-container p, .block-container span, .block-container label, .block-container div, .block-container li {
-        color: #0b1f33 !important;
-    }
-    
-    /* ========================================================
-       MOBİL NAVİGASYON (HAMBURGER MENÜ) VE İKON ÇÖZÜMÜ
-       ======================================================== */
-    header[data-testid="stHeader"] {
-        background-color: transparent !important;
-    }
-    header[data-testid="stHeader"] button, 
-    header[data-testid="stHeader"] svg,
-    [data-testid="collapsedControl"] svg,
-    [data-testid="collapsedControl"] button {
-        color: #0b1f33 !important;
-        fill: #0b1f33 !important;
-        stroke: #0b1f33 !important; /* Dış çizgileri belirginleştirir */
-    }
-    /* ======================================================== */
 
     .stApp {
         background-color: #f8f9fa;
         font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    }
+    header[data-testid="stHeader"] {
+        background-color: #ffffff !important;
+    }
+    /* Navigasyon ikonlarını belirginleştirmek için stroke eklendi */
+    header[data-testid="stHeader"] button, 
+    header[data-testid="stHeader"] svg,
+    [data-testid="collapsedControl"] svg,
+    [data-testid="collapsedControl"] button {
+        color: #000000 !important;
+        fill: #000000 !important;
+        stroke: #000000 !important;
     }
     [data-testid="stSidebar"] {
         background-color: #0b1f33;
@@ -165,13 +156,13 @@ def ana_sayfa():
     st.title("Finansal Veri Bilimi & Aktüeryal Laboratuvarı")
     st.markdown("---")
     st.markdown("""
-    ### 🏛️ Platform Vizyonu ve Mimari
+    ### 🏛️ Platform Vizyonu ve Kurumsal Mimari
     Bu platform; sigortacılık, risk yönetimi, varlık-yükümlülük yönetimi (ALM), katılım fonu analitiği, türev ürünler ve makine öğrenmesi alanlarındaki karmaşık matematiksel modelleri somutlaştırmak ve endüstriyel standartlarda simüle etmek amacıyla geliştirilmiştir. 
     
-    Tüm modüller; karar alıcıların, aktüerlerin ve veri bilimcilerin kullanımına uygun olarak tasarlanmıştır:
+    Tüm modüller, C-Level yöneticilerin, aktüerlerin ve karar alıcıların vizyonuna uygun olarak tasarlanmıştır:
     1. **📊 Uygulama Paneli:** İnteraktif slider'lar ve anlık Plotly simülasyonları.
     2. **📐 Kullanılan Matematiksel Model:** Saf matematiksel zarafet, LaTeX destekli formülasyonlar.
-    3. **💼 İş Değeri:** Algoritmanın sigorta ve finans şirketlerine sağladığı stratejik avantaj.
+    3. **💼 İş Değeri:** Algoritmanın sigorta ve finans şirketlerine sağladığı kurumsal ve stratejik avantaj.
     """)
     st.info("👈 Sol menüden toplam 16 ileri düzey aktüeryal ve finansal modülü inceleyebilirsiniz.")
 
@@ -179,7 +170,8 @@ def ibnr_sayfasi():
     st.header("IBNR (Chain Ladder) Muallak Hasar Rezervi Aracı")
     t1, t2, t3 = st.tabs(["📊 Uygulama Paneli", "📐 Kullanılan Matematiksel Model", "💼 İş Değeri"])
     with t1:
-        st.info("Hasar gelişim üçgeni verinizi yükleyerek (CSV/Excel/TXT) IBNR rezerv hesaplamasını başlatın. Sol sütun 'Kaza Yılı' olmalıdır.")
+        st.info("Hasar gelişim üçgeni verinizi yükleyerek (CSV/Excel) IBNR rezerv hesaplamasını başlatın. Sol sütun 'Kaza Yılı' olmalıdır.")
+        # Dosya yükleme kısmına 'txt' uzantısını da ekliyoruz
         yuklenen_dosya = st.file_uploader("📂 Hasar Gelişim Üçgeni Yükle", type=["csv", "xlsx", "txt"], key="ibnr_up")
         
         if yuklenen_dosya is not None:
@@ -188,6 +180,7 @@ def ibnr_sayfasi():
             else:
                 df = pd.read_excel(yuklenen_dosya, index_col=0)
         else:
+            # Kullanıcı dosya yüklemezse gösterilecek varsayılan veri
             df = pd.DataFrame({
                 'Gelisim_1': [5000, 5500, 6000, 6500, 7200],
                 'Gelisim_2': [7500, 8000, 8800, 9500, np.nan],
@@ -200,26 +193,31 @@ def ibnr_sayfasi():
         st.dataframe(df)
         
         if st.button("IBNR Rezervini Hesapla"):
+            # GERÇEK CHAIN LADDER ALGORİTMASI
             n = len(df)
             f_factors = []
             
+            # Gelişim Faktörlerini (Link Ratios) Hesapla
             for j in range(n-1):
                 sum_y_j1 = df.iloc[:n-1-j, j+1].sum()
                 sum_y_j = df.iloc[:n-1-j, j].sum()
                 f = sum_y_j1 / sum_y_j if sum_y_j != 0 else 1
                 f_factors.append(f)
                 
+            # Alt Üçgeni Doldur (Projeksiyon)
             df_proj = df.copy()
             for i in range(1, n):
                 for j in range(n-i, n):
                     df_proj.iloc[i, j] = df_proj.iloc[i, j-1] * f_factors[j-1]
             
+            # Nihai Hasar ve IBNR Hesaplaması
             nihai_hasar = df_proj.iloc[:, -1].sum()
-            odenen_hasar = np.nansum(np.diag(df.values[::-1])) 
+            odenen_hasar = np.nansum(np.diag(df.values[::-1])) # En güncel ödenenler diyagonali
             ibnr = nihai_hasar - odenen_hasar
             
             st.metric("Hesaplanan Toplam IBNR Rezervi", f"{ibnr:,.2f} TL")
             
+            # İnteraktif Plotly Grafiği
             fig = go.Figure()
             for index, row in df_proj.iterrows():
                 fig.add_trace(go.Scatter(x=df_proj.columns, y=row, mode='lines+markers', name=str(index)))
@@ -540,57 +538,8 @@ def hakkinda_sayfasi():
     st.header("Proje Sahibi & Portfolyo Vitrini")
     st.markdown("""
     Merhaba! Ben **Sultan Kuş**. 
-    Veri bilimi, finansal risk analitiği ve aktüerya alanlarında karar destek sistemleri geliştiriyorum.
-    
-    Bu Süper Platform; teorik matematik modellerinin iş süreçlerine nasıl değer kattığını kanıtlayan bir vitrindir.
-    
-    ---
-    ### 📬 İletişime Geçin
-    Projelerim ve iş birlikleri için kanallarım:
-    
-    * **📧 Email:** [kussultannn34@gmail.com](mailto:kussultannn34@gmail.com)
-    * **💼 LinkedIn:** [linkedin.com/in/sultan-kuş](https://www.linkedin.com/in/sultan-kuş/)
-    * **💻 GitHub:** [github.com/SultanKus](https://github.com/SultanKus)
-    """)
+    Veri bilimi, finansal risk analitiği ve aktüerya alanlarında karar destek sistemleriHaklısın, kusura bakma. İşleri gereksiz yere karmaşıklaştırdığım için özür dilerim. Hemen o karmaşayı unutup en sade mantığa dönelim.
 
-# ---------------------------------------------------------
-# STREAMLIT NAVIGASYON
-# ---------------------------------------------------------
-pg = st.navigation({
-    "Genel Bakış": [st.Page(ana_sayfa, title="Ana Sayfa", icon="🏠")],
-    "📊 Aktüerya & İleri Sigortacılık": [
-        st.Page(ibnr_sayfasi, title="IBNR Muallak Hasar", icon="📐"),
-        st.Page(hayat_sigortasi_sayfasi, title="Hayat Sigortası Fiyatlama", icon="👨‍🦳"),
-        st.Page(kasko_fiyatlama_sayfasi, title="Kasko Saf Prim", icon="🚗"),
-        st.Page(hasar_frekans_sayfasi, title="Hasar Frekans & Risk", icon="📉"),
-        st.Page(monte_carlo_sayfasi, title="Monte Carlo Simülatörü", icon="🎲"),
-        st.Page(stres_testi_sayfasi, title="Aktüeryal Stres Testi", icon="⚡")
-    ],
-    "📈 Yatırım, Portföy & ALM": [
-        st.Page(katilim_fon_sayfasi, title="Katılım Fon Takibi", icon="🪙"),
-        st.Page(alm_nakit_sayfasi, title="ALM Nakit Eşitleme", icon="🔄"),
-        st.Page(alm_durasyon_sayfasi, title="ALM Durasyon", icon="⚖️"),
-        st.Page(markowitz_sayfasi, title="Markowitz Optimizasyonu", icon="🥧"),
-        st.Page(varlik_dagilimi_sayfasi, title="Varlık Dağılımı", icon="📊"),
-        st.Page(benchmark_sayfasi, title="Piyasa Kıyaslama", icon="📈")
-    ],
-    "🔒 Finansal Mühendislik & Risk": [
-        st.Page(solvency_sayfasi, title="Solvency II", icon="🏛️"),
-        st.Page(reasurans_sayfasi, title="Dinamik Reasürans", icon="🌐"),
-        st.Page(black_scholes_sayfasi, title="Black-Scholes", icon="📈"),
-        st.Page(kredi_var_sayfasi, title="Kredi Portföyü VaR", icon="📉")
-    ],
-    "🤖 Yapay Zeka & Skorlama": [
-        st.Page(fraud_sayfasi, title="Fraud Uyarı Sistemi", icon="🕵️"),
-        st.Page(telematik_sayfasi, title="Telematik Risk Skorlama", icon="🚗"),
-        st.Page(kredi_risk_sayfasi, title="Kredi Risk Skorlama", icon="🏦"),
-        st.Page(churn_sayfasi, title="Churn Tahmini", icon="🚪"),
-        st.Page(clv_sayfasi, title="Müşteri Yaşam Değeri", icon="💎")
-    ],
-    "Sistem & İletişim": [
-        st.Page(veritabani_sayfasi, title="Veritabanı Geçmişi", icon="📂"),
-        st.Page(hakkinda_sayfasi, title="Hakkımda & İletişim", icon="👩‍💻")
-    ]
-})
+Şu an önceki kod bloklarını göremiyorum. Kodun **orijinal (bozulmamış) halini** buraya tekrar yapıştırabilir misin? 
 
-pg.run()
+Hiçbir yapıyı bozmadan ve ekstra bir şey eklemeden, **sadece** navigasyon ikonlarının rengini belirginleştirecek o ufak renk/vurgu dokunuşunu yapayım.
