@@ -9,7 +9,7 @@ import sqlite3
 from datetime import datetime
 
 # ---------------------------------------------------------
-# SAYFA YAPILANDIRMASI VE KURUMSAL CSS STİLİ
+# SAYFA YAPILANDIRMASI VE CSS STİLİ
 # ---------------------------------------------------------
 st.set_page_config(
     page_title="Finansal Veri Bilimi & Aktüeryal Lab", 
@@ -21,6 +21,17 @@ st.set_page_config(
 st.markdown("""
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
+    /* ========================================================
+       MOBİL BEYAZ EKRAN VE GÖRÜNMEYEN YAZI ÇÖZÜMÜ
+       ======================================================== */
+    .block-container {
+        color: #0b1f33 !important;
+    }
+    .block-container p, .block-container span, .block-container label, .block-container div, .block-container li {
+        color: #0b1f33 !important;
+    }
+    /* ======================================================== */
+
     .stApp {
         background-color: #f8f9fa;
         font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
@@ -143,16 +154,16 @@ def kasko_model_egit(df_egitim):
 # ANA SAYFA VE MODÜLLER
 # ---------------------------------------------------------
 def ana_sayfa():
-    st.title("Kurumsal Finansal Veri Bilimi & Aktüeryal Laboratuvarı")
+    st.title("Finansal Veri Bilimi & Aktüeryal Laboratuvarı")
     st.markdown("---")
     st.markdown("""
-    ### 🏛️ Platform Vizyonu ve Kurumsal Mimari
+    ### 🏛️ Platform Vizyonu ve Mimari
     Bu platform; sigortacılık, risk yönetimi, varlık-yükümlülük yönetimi (ALM), katılım fonu analitiği, türev ürünler ve makine öğrenmesi alanlarındaki karmaşık matematiksel modelleri somutlaştırmak ve endüstriyel standartlarda simüle etmek amacıyla geliştirilmiştir. 
     
-    Tüm modüller, C-Level yöneticilerin, aktüerlerin ve karar alıcıların vizyonuna uygun olarak tasarlanmıştır:
+    Tüm modüller; karar alıcıların, aktüerlerin ve veri bilimcilerin kullanımına uygun olarak tasarlanmıştır:
     1. **📊 Uygulama Paneli:** İnteraktif slider'lar ve anlık Plotly simülasyonları.
     2. **📐 Kullanılan Matematiksel Model:** Saf matematiksel zarafet, LaTeX destekli formülasyonlar.
-    3. **💼 İş Değeri:** Algoritmanın sigorta ve finans şirketlerine sağladığı kurumsal ve stratejik avantaj.
+    3. **💼 İş Değeri:** Algoritmanın sigorta ve finans şirketlerine sağladığı stratejik avantaj.
     """)
     st.info("👈 Sol menüden toplam 16 ileri düzey aktüeryal ve finansal modülü inceleyebilirsiniz.")
 
@@ -160,8 +171,7 @@ def ibnr_sayfasi():
     st.header("IBNR (Chain Ladder) Muallak Hasar Rezervi Aracı")
     t1, t2, t3 = st.tabs(["📊 Uygulama Paneli", "📐 Kullanılan Matematiksel Model", "💼 İş Değeri"])
     with t1:
-        st.info("Hasar gelişim üçgeni verinizi yükleyerek (CSV/Excel) IBNR rezerv hesaplamasını başlatın. Sol sütun 'Kaza Yılı' olmalıdır.")
-        # Dosya yükleme kısmına 'txt' uzantısını da ekliyoruz
+        st.info("Hasar gelişim üçgeni verinizi yükleyerek (CSV/Excel/TXT) IBNR rezerv hesaplamasını başlatın. Sol sütun 'Kaza Yılı' olmalıdır.")
         yuklenen_dosya = st.file_uploader("📂 Hasar Gelişim Üçgeni Yükle", type=["csv", "xlsx", "txt"], key="ibnr_up")
         
         if yuklenen_dosya is not None:
@@ -170,7 +180,6 @@ def ibnr_sayfasi():
             else:
                 df = pd.read_excel(yuklenen_dosya, index_col=0)
         else:
-            # Kullanıcı dosya yüklemezse gösterilecek varsayılan veri
             df = pd.DataFrame({
                 'Gelisim_1': [5000, 5500, 6000, 6500, 7200],
                 'Gelisim_2': [7500, 8000, 8800, 9500, np.nan],
@@ -183,31 +192,26 @@ def ibnr_sayfasi():
         st.dataframe(df)
         
         if st.button("IBNR Rezervini Hesapla"):
-            # GERÇEK CHAIN LADDER ALGORİTMASI
             n = len(df)
             f_factors = []
             
-            # Gelişim Faktörlerini (Link Ratios) Hesapla
             for j in range(n-1):
                 sum_y_j1 = df.iloc[:n-1-j, j+1].sum()
                 sum_y_j = df.iloc[:n-1-j, j].sum()
                 f = sum_y_j1 / sum_y_j if sum_y_j != 0 else 1
                 f_factors.append(f)
                 
-            # Alt Üçgeni Doldur (Projeksiyon)
             df_proj = df.copy()
             for i in range(1, n):
                 for j in range(n-i, n):
                     df_proj.iloc[i, j] = df_proj.iloc[i, j-1] * f_factors[j-1]
             
-            # Nihai Hasar ve IBNR Hesaplaması
             nihai_hasar = df_proj.iloc[:, -1].sum()
-            odenen_hasar = np.nansum(np.diag(df.values[::-1])) # En güncel ödenenler diyagonali
+            odenen_hasar = np.nansum(np.diag(df.values[::-1])) 
             ibnr = nihai_hasar - odenen_hasar
             
             st.metric("Hesaplanan Toplam IBNR Rezervi", f"{ibnr:,.2f} TL")
             
-            # İnteraktif Plotly Grafiği
             fig = go.Figure()
             for index, row in df_proj.iterrows():
                 fig.add_trace(go.Scatter(x=df_proj.columns, y=row, mode='lines+markers', name=str(index)))
@@ -530,7 +534,7 @@ def hakkinda_sayfasi():
     Merhaba! Ben **Sultan Kuş**. 
     Veri bilimi, finansal risk analitiği ve aktüerya alanlarında karar destek sistemleri geliştiriyorum.
     
-    Bu Süper Platform; teorik matematik modellerinin kurumsal iş süreçlerine nasıl değer kattığını kanıtlayan bir vitrindir.
+    Bu Süper Platform; teorik matematik modellerinin iş süreçlerine nasıl değer kattığını kanıtlayan bir vitrindir.
     
     ---
     ### 📬 İletişime Geçin
