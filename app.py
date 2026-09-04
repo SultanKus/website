@@ -30,18 +30,26 @@ st.markdown("""
     .block-container p, .block-container span, .block-container label, .block-container div, .block-container li {
         color: #0b1f33 !important;
     }
+    
+    /* ========================================================
+       MOBİL NAVİGASYON (HAMBURGER MENÜ) VE İKON ÇÖZÜMÜ
+       ======================================================== */
+    header[data-testid="stHeader"] {
+        background-color: transparent !important;
+    }
+    header[data-testid="stHeader"] button, 
+    header[data-testid="stHeader"] svg,
+    [data-testid="collapsedControl"] svg,
+    [data-testid="collapsedControl"] button {
+        color: #0b1f33 !important;
+        fill: #0b1f33 !important;
+        stroke: #0b1f33 !important; /* Dış çizgileri belirginleştirir */
+    }
     /* ======================================================== */
 
     .stApp {
         background-color: #f8f9fa;
         font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-    }
-    header[data-testid="stHeader"] {
-        background-color: #ffffff !important;
-    }
-    header[data-testid="stHeader"] button, header[data-testid="stHeader"] svg {
-        color: #000000 !important;
-        fill: #000000 !important;
     }
     [data-testid="stSidebar"] {
         background-color: #0b1f33;
