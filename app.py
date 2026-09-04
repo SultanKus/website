@@ -244,7 +244,7 @@ def hayat_sigortasi_sayfasi():
             q_x = 0.0015 if cinsiyet == "Erkek" else 0.0011
             iskonto = 1 / (1 + teknik_faiz/100)
             nsp = teminat * q_x * iskonto * (80 - yas) * 0.4
-            anuite = (teminat / 12) * (80 - yas) * 0.6 * iskonto
+            anuite = (teminat / 12) * 0.6 * iskonto
             m1, m2 = st.columns(2)
             m1.metric("Hayat Sigortası Net Tek Prim", f"{nsp:,.2f} TL")
             m2.metric("Aylık Emeklilik Maaşı (Anüite)", f"{anuite:,.2f} TL")
