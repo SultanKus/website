@@ -36,6 +36,7 @@ st.markdown("""
         background-color: #f8f9fa;
         font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
     }
+    
     /* Masaüstü ve Genel Header Ayarları */
     header[data-testid="stHeader"] {
         background-color: #ffffff !important;
@@ -53,6 +54,7 @@ st.markdown("""
         color: #000000 !important;
         fill: #000000 !important;
     }
+    
     [data-testid="stSidebar"] {
         background-color: #0b1f33;
         color: #ffffff;
