@@ -18,7 +18,6 @@ st.set_page_config(
 )
 
 # FontAwesome İkon Kütüphanesi ve CSS
-# FontAwesome İkon Kütüphanesi ve CSS
 st.markdown("""
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
