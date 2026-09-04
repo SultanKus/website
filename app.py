@@ -36,10 +36,20 @@ st.markdown("""
         background-color: #f8f9fa;
         font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
     }
+    /* Masaüstü ve Genel Header Ayarları */
     header[data-testid="stHeader"] {
         background-color: #ffffff !important;
     }
-    header[data-testid="stHeader"] button, header[data-testid="stHeader"] svg {
+    header[data-testid="stHeader"] * {
+        color: #000000 !important;
+        fill: #000000 !important;
+    }
+    
+    /* MOBİL ÖZEL: Hamburger Menü ve Dinamik İkon Çözümü */
+    [data-testid="collapsedControl"] svg,
+    [data-testid="collapsedControl"] path,
+    [data-testid="stSidebarCollapsedControl"] svg,
+    button[kind="header"] svg {
         color: #000000 !important;
         fill: #000000 !important;
     }
