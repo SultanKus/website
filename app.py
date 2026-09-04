@@ -19,81 +19,74 @@ st.set_page_config(
 
 # FontAwesome İkon Kütüphanesi ve CSS
 st.markdown("""
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-    /* ========================================================
-       MOBİL BEYAZ EKRAN VE GÖRÜNMEYEN YAZI ÇÖZÜMÜ
-       ======================================================== */
-    .block-container {
-        color: #0b1f33 !important;
-    }
-    .block-container p, .block-container span, .block-container label, .block-container div, .block-container li {
-        color: #0b1f33 !important;
-    }
-    /* ======================================================== */
-
-    .stApp {
-        background-color: #f8f9fa;
-        font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-    }
-    
-    /* Masaüstü ve Genel Header Ayarları */
-    header[data-testid="stHeader"] {
-        background-color: #ffffff !important;
-    }
-    header[data-testid="stHeader"] * {
-        color: #000000 !important;
-        fill: #000000 !important;
-    }
-    
-    /* MOBİL ÖZEL: Hamburger Menü ve Dinamik İkon Çözümü */
-    [data-testid="collapsedControl"] svg,
-    [data-testid="collapsedControl"] path,
-    [data-testid="stSidebarCollapsedControl"] svg,
-    button[kind="header"] svg {
-        color: #000000 !important;
-        fill: #000000 !important;
-    }
-    
-    [data-testid="stSidebar"] {
-        background-color: #0b1f33;
-        color: #ffffff;
-    }
-    [data-testid="stSidebar"] .stMarkdown h1, [data-testid="stSidebar"] .stMarkdown h2, [data-testid="stSidebar"] .stMarkdown h3, [data-testid="stSidebar"] span {
-        color: #ffffff !important;
-    }
-    h1, h2, h3, h4, h5, h6 {
-        color: #0b1f33 !important;
-        font-weight: 700 !important;
-        letter-spacing: -0.5px;
-    }
-    .stSlider [data-baseweb="slider"] div[role="slider"] {
-        background-color: #0055a5 !important;
-        border-color: #0055a5 !important;
-    }
-    .stSlider [data-baseweb="slider"] div > div > div > div {
-        background-color: #0055a5 !important;
-    }
-    div.stMetric {
-        background-color: #ffffff;
-        padding: 15px;
-        border-radius: 8px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-        border-left: 4px solid #0055a5;
-    }
-    .stButton>button {
-        background-color: #0055a5;
-        color: white;
-        border-radius: 6px;
-        border: none;
-        padding: 0.5rem 1rem;
-        font-weight: 600;
-    }
-    .stButton>button:hover {
-        background-color: #003d73;
-        color: white;
-    }
-    </style>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+/* MOBİL BEYAZ EKRAN VE GÖRÜNMEYEN YAZI ÇÖZÜMÜ */
+.block-container {
+    color: #0b1f33 !important;
+}
+.block-container p, .block-container span, .block-container label, .block-container div, .block-container li {
+    color: #0b1f33 !important;
+}
+.stApp {
+    background-color: #f8f9fa;
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+}
+/* Masaüstü ve Genel Header Ayarları */
+header[data-testid="stHeader"] {
+    background-color: #ffffff !important;
+}
+header[data-testid="stHeader"] * {
+    color: #000000 !important;
+    fill: #000000 !important;
+}
+/* MOBİL ÖZEL: Hamburger Menü ve Dinamik İkon Çözümü */
+[data-testid="collapsedControl"] svg,
+[data-testid="collapsedControl"] path,
+[data-testid="stSidebarCollapsedControl"] svg,
+button[kind="header"] svg {
+    color: #000000 !important;
+    fill: #000000 !important;
+}
+[data-testid="stSidebar"] {
+    background-color: #0b1f33;
+    color: #ffffff;
+}
+[data-testid="stSidebar"] .stMarkdown h1, [data-testid="stSidebar"] .stMarkdown h2, [data-testid="stSidebar"] .stMarkdown h3, [data-testid="stSidebar"] span {
+    color: #ffffff !important;
+}
+h1, h2, h3, h4, h5, h6 {
+    color: #0b1f33 !important;
+    font-weight: 700 !important;
+    letter-spacing: -0.5px;
+}
+.stSlider [data-baseweb="slider"] div[role="slider"] {
+    background-color: #0055a5 !important;
+    border-color: #0055a5 !important;
+}
+.stSlider [data-baseweb="slider"] div > div > div > div {
+    background-color: #0055a5 !important;
+}
+div.stMetric {
+    background-color: #ffffff;
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    border-left: 4px solid #0055a5;
+}
+.stButton>button {
+    background-color: #0055a5;
+    color: white;
+    border-radius: 6px;
+    border: none;
+    padding: 0.5rem 1rem;
+    font-weight: 600;
+}
+.stButton>button:hover {
+    background-color: #003d73;
+    color: white;
+}
+</style>
 """, unsafe_allow_html=True)
 
 # ---------------------------------------------------------
