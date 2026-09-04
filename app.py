@@ -542,4 +542,4 @@ def hakkinda_sayfasi():
 
 Şu an önceki kod bloklarını göremiyorum. Kodun **orijinal (bozulmamış) halini** buraya tekrar yapıştırabilir misin? 
 
-Hiçbir yapıyı bozmadan ve ekstra bir şey eklemeden, **sadece** navigasyon ikonlarının rengini belirginleştirecek o ufak renk/vurgu dokunuşunu yapayım.
+Hiçbir yapıyı bozmadan ve ekstra bir şey eklemeden, **sadece** navigasyon ikonlarının rengini belirginleştirecek o ufak renk/vurgu dokunuşunu yapayım.""")
