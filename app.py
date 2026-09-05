@@ -285,15 +285,64 @@ def kasko_fiyatlama_sayfasi():
 def hasar_frekans_sayfasi():
     st.header("Hasar Frekansı & Aktüeryal Portföy Dağılımı")
     t1, t2, t3 = st.tabs(["📊 Uygulama Paneli", "📐 Kullanılan Matematiksel Model", "💼 İş Değeri"])
+    
     with t1:
-        st.file_uploader("📂 Kendi Portföy Veri Setinizi Yükleyin", type=["csv", "xlsx"], key="hasar_up")
-        df_sigorta = varsayilan_kasko_verisi_getir()
-        yas_hasar = df_sigorta.groupby('DrivAge')['ClaimNb'].mean().reset_index()
-        st.plotly_chart(px.line(yas_hasar, x='DrivAge', y='ClaimNb', title="Yaş Bazlı Ortalama Hasar Frekansı", markers=True), width='stretch')
+        st.info("Kendi verinizi yükleyin veya varsayılan açık kaynaklı kasko verisi üzerinden analizi inceleyin.")
+        yuklenen_dosya = st.file_uploader("📂 Kendi Portföy Veri Setinizi Yükleyin (CSV/Excel)", type=["csv", "xlsx"], key="hasar_up")
+        
+        # Dosya yükleme mantığı
+        if yuklenen_dosya is not None:
+            if yuklenen_dosya.name.endswith('.csv'):
+                df_sigorta = pd.read_csv(yuklenen_dosya)
+            else:
+                df_sigorta = pd.read_excel(yuklenen_dosya)
+        else:
+            df_sigorta = varsayilan_kasko_verisi_getir()
+            
+        # Doğru Aktüeryal Hesaplama Kontrolü
+        if 'Exposure' in df_sigorta.columns and 'ClaimNb' in df_sigorta.columns and 'DrivAge' in df_sigorta.columns:
+            
+            # Portföy Genel Metrikleri
+            toplam_hasar = df_sigorta['ClaimNb'].sum()
+            toplam_exposure = df_sigorta['Exposure'].sum()
+            genel_frekans = (toplam_hasar / toplam_exposure) if toplam_exposure > 0 else 0
+            
+            # Metrik Kartları
+            c1, c2, c3 = st.columns(3)
+            c1.metric("Toplam Hasar Adedi", f"{toplam_hasar:,.0f}")
+            c2.metric("Toplam Poliçe Yılı (Exposure)", f"{toplam_exposure:,.2f}")
+            c3.metric("Genel Portföy Frekansı", f"% {genel_frekans * 100:.2f}")
+            
+            st.markdown("---")
+            
+            # Yaş bazlı doğru aktüeryal frekans hesaplaması
+            yas_gruplari = df_sigorta.groupby('DrivAge').agg({'ClaimNb': 'sum', 'Exposure': 'sum'}).reset_index()
+            yas_gruplari['Frekans'] = yas_gruplari['ClaimNb'] / yas_gruplari['Exposure']
+            
+            # Frekans Grafiği
+            fig = px.line(yas_gruplari, x='DrivAge', y='Frekans', 
+                          title="Yaş Bazlı Gerçek Hasar Frekansı (Toplam Hasar / Toplam Exposure)", 
+                          markers=True)
+            fig.update_traces(line_color='#0055a5', marker=dict(size=6))
+            fig.update_layout(xaxis_title="Sürücü Yaşı", yaxis_title="Hasar Frekansı", hovermode="x unified")
+            
+            st.plotly_chart(fig, width='stretch')
+        else:
+            st.error("⚠️ Yüklediğiniz veri setinde 'DrivAge', 'ClaimNb' ve 'Exposure' sütunları bulunmalıdır!")
+            
     with t2:
-        st.latex(r"\text{Frekans} = \frac{\sum \text{Hasar Adedi}}{\sum \text{Poliçe Yılı}}")
+        st.markdown("Bir portföyün veya belirli bir segmentin hasar frekansı, salt ortalama alınarak değil; toplam hasar adedinin, portföyde kalınan süreye (Poliçe Yılı / Exposure) oranlanmasıyla bulunur.")
+        st.latex(r"\text{Frekans} = \frac{\sum \text{Hasar Adedi}}{\sum \text{Exposure (Poliçe Yılı)}}")
+        st.info("Bu modelde, her bir risk profilinin maruz kaldığı süre (Poliçe Yılı / Exposure) hesaba katılarak ağırlıklı hasar sıklığı hesaplanmaktadır. Aktüeryal modellemelerde hasar adetleri kesikli ve pozitif tamsayılar olduğu için, frekans tahminlemelerinde Poisson Dağılımı bazlı Genelleştirilmiş Doğrusal Modeller (GLM) temel alınır.")
+        
     with t3:
-        st.markdown("Portföydeki toksik ve kârlı segmentlerin ayrıştırılmasını sağlar.")
+        st.markdown("""
+        **Portföy Dağılımının Stratejik Önemi:**
+        
+        * **Risk Bazlı Fiyatlandırma:** Kârlı segmentlere indirim sunarak sadakati artırırken, toksik segmentlere doğru prim yüklemesi (surprim) yapılmasını sağlar.
+        * **Ters Seçimin (Adverse Selection) Engellenmesi:** Şirketin yüksek riskli profiller için bir "güvenli liman" haline gelmesini önler.
+        * **Kârlılık ve Büyüme Dengesi:** Aktüeryal portföy dağılımını optimize ederek şirketin teknik kâr marjını güvenceye alır.
+        """)
 
 def monte_carlo_sayfasi():
     st.header("Monte Carlo ile Toplu Hasar Simülatörü")
