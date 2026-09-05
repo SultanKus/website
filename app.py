@@ -290,24 +290,50 @@ def hasar_frekans_sayfasi():
         st.info("Kendi verinizi yükleyin veya varsayılan açık kaynaklı kasko verisi üzerinden analizi inceleyin.")
         yuklenen_dosya = st.file_uploader("📂 Kendi Portföy Veri Setinizi Yükleyin (CSV/Excel)", type=["csv", "xlsx"], key="hasar_up")
         
-        # Dosya yükleme mantığı
         if yuklenen_dosya is not None:
             if yuklenen_dosya.name.endswith('.csv'):
                 df_sigorta = pd.read_csv(yuklenen_dosya)
             else:
                 df_sigorta = pd.read_excel(yuklenen_dosya)
+            
+            st.write("### ⚙️ Akıllı Sütun Eşleştirme (Smart Column Mapping)")
+            st.markdown("Sistem, yüklediğiniz verideki sütunları **otomatik** algılamaya çalıştı. Yanlışlık varsa manuel düzeltebilirsiniz:")
+            
+            kolonlar = df_sigorta.columns.tolist()
+            
+            # --- OTOMATİK ALGILAMA ALGORİTMASI ---
+            def otomatik_algila(anahtar_kelimeler, kolon_listesi):
+                for i, kolon in enumerate(kolon_listesi):
+                    kolon_temiz = str(kolon).lower().replace(" ", "").replace("_", "")
+                    if any(anahtar in kolon_temiz for anahtar in anahtar_kelimeler):
+                        return i
+                return 0 # Bulamazsa varsayılan olarak ilk kolonu seçer
+
+            yas_index = otomatik_algila(['age', 'yaş', 'yas', 'driver'], kolonlar)
+            hasar_index = otomatik_algila(['claim', 'hasar', 'adet', 'count', 'freq', 'nb'], kolonlar)
+            exposure_index = otomatik_algila(['exp', 'exposure', 'süre', 'sure', 'duration', 'yıl', 'yil'], kolonlar)
+            # ------------------------------------
+            
+            # Seçim kutularının (selectbox) varsayılan değerleri otomatik algılanan indeksler olacak
+            c1, c2, c3 = st.columns(3)
+            yas_kolonu = c1.selectbox("Sürücü Yaşı Sütunu", kolonlar, index=yas_index)
+            hasar_kolonu = c2.selectbox("Hasar Adedi Sütunu", kolonlar, index=hasar_index)
+            exposure_kolonu = c3.selectbox("Poliçe Süresi (Exposure) Sütunu", kolonlar, index=exposure_index)
+            
+            df_hesap = df_sigorta.rename(columns={yas_kolonu: 'DrivAge', hasar_kolonu: 'ClaimNb', exposure_kolonu: 'Exposure'})
+            
         else:
-            df_sigorta = varsayilan_kasko_verisi_getir()
+            df_hesap = varsayilan_kasko_verisi_getir()
             
-        # Doğru Aktüeryal Hesaplama Kontrolü
-        if 'Exposure' in df_sigorta.columns and 'ClaimNb' in df_sigorta.columns and 'DrivAge' in df_sigorta.columns:
+        # Aktüeryal Hesaplama ve Görselleştirme Aşaması
+        if 'Exposure' in df_hesap.columns and 'ClaimNb' in df_hesap.columns and 'DrivAge' in df_hesap.columns:
             
-            # Portföy Genel Metrikleri
-            toplam_hasar = df_sigorta['ClaimNb'].sum()
-            toplam_exposure = df_sigorta['Exposure'].sum()
+            toplam_hasar = df_hesap['ClaimNb'].sum()
+            toplam_exposure = df_hesap['Exposure'].sum()
             genel_frekans = (toplam_hasar / toplam_exposure) if toplam_exposure > 0 else 0
             
-            # Metrik Kartları
+            st.markdown("---")
+            
             c1, c2, c3 = st.columns(3)
             c1.metric("Toplam Hasar Adedi", f"{toplam_hasar:,.0f}")
             c2.metric("Toplam Poliçe Yılı (Exposure)", f"{toplam_exposure:,.2f}")
@@ -315,11 +341,10 @@ def hasar_frekans_sayfasi():
             
             st.markdown("---")
             
-            # Yaş bazlı doğru aktüeryal frekans hesaplaması
-            yas_gruplari = df_sigorta.groupby('DrivAge').agg({'ClaimNb': 'sum', 'Exposure': 'sum'}).reset_index()
+            yas_gruplari = df_hesap.groupby('DrivAge').agg({'ClaimNb': 'sum', 'Exposure': 'sum'}).reset_index()
+            yas_gruplari = yas_gruplari[yas_gruplari['Exposure'] > 0] 
             yas_gruplari['Frekans'] = yas_gruplari['ClaimNb'] / yas_gruplari['Exposure']
             
-            # Frekans Grafiği
             fig = px.line(yas_gruplari, x='DrivAge', y='Frekans', 
                           title="Yaş Bazlı Gerçek Hasar Frekansı (Toplam Hasar / Toplam Exposure)", 
                           markers=True)
@@ -328,7 +353,7 @@ def hasar_frekans_sayfasi():
             
             st.plotly_chart(fig, width='stretch')
         else:
-            st.error("⚠️ Yüklediğiniz veri setinde 'DrivAge', 'ClaimNb' ve 'Exposure' sütunları bulunmalıdır!")
+            st.error("Beklenen sütunlar bulunamadı. Lütfen eşleştirmeyi kontrol edin.")
             
     with t2:
         st.markdown("Bir portföyün veya belirli bir segmentin hasar frekansı, salt ortalama alınarak değil; toplam hasar adedinin, portföyde kalınan süreye (Poliçe Yılı / Exposure) oranlanmasıyla bulunur.")
@@ -343,7 +368,6 @@ def hasar_frekans_sayfasi():
         * **Ters Seçimin (Adverse Selection) Engellenmesi:** Şirketin yüksek riskli profiller için bir "güvenli liman" haline gelmesini önler.
         * **Kârlılık ve Büyüme Dengesi:** Aktüeryal portföy dağılımını optimize ederek şirketin teknik kâr marjını güvenceye alır.
         """)
-
 def monte_carlo_sayfasi():
     st.header("Monte Carlo ile Toplu Hasar Simülatörü")
     t1, t2, t3 = st.tabs(["📊 Uygulama Paneli", "📐 Kullanılan Matematiksel Model", "💼 İş Değeri"])
