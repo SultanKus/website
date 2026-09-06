@@ -22,70 +22,20 @@ st.markdown("""
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <style>
 /* MOBİL BEYAZ EKRAN VE GÖRÜNMEYEN YAZI ÇÖZÜMÜ */
-.block-container {
-    color: #0b1f33 !important;
-}
-.block-container p, .block-container span, .block-container label, .block-container div, .block-container li {
-    color: #0b1f33 !important;
-}
-.stApp {
-    background-color: #f8f9fa;
-    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-}
-/* Masaüstü ve Genel Header Ayarları */
-header[data-testid="stHeader"] {
-    background-color: #ffffff !important;
-}
-header[data-testid="stHeader"] * {
-    color: #000000 !important;
-    fill: #000000 !important;
-}
-/* MOBİL ÖZEL: Hamburger Menü ve Dinamik İkon Çözümü */
-[data-testid="collapsedControl"] svg,
-[data-testid="collapsedControl"] path,
-[data-testid="stSidebarCollapsedControl"] svg,
-button[kind="header"] svg {
-    color: #000000 !important;
-    fill: #000000 !important;
-}
-[data-testid="stSidebar"] {
-    background-color: #0b1f33;
-    color: #ffffff;
-}
-[data-testid="stSidebar"] .stMarkdown h1, [data-testid="stSidebar"] .stMarkdown h2, [data-testid="stSidebar"] .stMarkdown h3, [data-testid="stSidebar"] span {
-    color: #ffffff !important;
-}
-h1, h2, h3, h4, h5, h6 {
-    color: #0b1f33 !important;
-    font-weight: 700 !important;
-    letter-spacing: -0.5px;
-}
-.stSlider [data-baseweb="slider"] div[role="slider"] {
-    background-color: #0055a5 !important;
-    border-color: #0055a5 !important;
-}
-.stSlider [data-baseweb="slider"] div > div > div > div {
-    background-color: #0055a5 !important;
-}
-div.stMetric {
-    background-color: #ffffff;
-    padding: 15px;
-    border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-    border-left: 4px solid #0055a5;
-}
-.stButton>button {
-    background-color: #0055a5;
-    color: white;
-    border-radius: 6px;
-    border: none;
-    padding: 0.5rem 1rem;
-    font-weight: 600;
-}
-.stButton>button:hover {
-    background-color: #003d73;
-    color: white;
-}
+.block-container { color: #0b1f33 !important; }
+.block-container p, .block-container span, .block-container label, .block-container div, .block-container li { color: #0b1f33 !important; }
+.stApp { background-color: #f8f9fa; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; }
+header[data-testid="stHeader"] { background-color: #ffffff !important; }
+header[data-testid="stHeader"] * { color: #000000 !important; fill: #000000 !important; }
+[data-testid="collapsedControl"] svg, [data-testid="collapsedControl"] path, [data-testid="stSidebarCollapsedControl"] svg, button[kind="header"] svg { color: #000000 !important; fill: #000000 !important; }
+[data-testid="stSidebar"] { background-color: #0b1f33; color: #ffffff; }
+[data-testid="stSidebar"] .stMarkdown h1, [data-testid="stSidebar"] .stMarkdown h2, [data-testid="stSidebar"] .stMarkdown h3, [data-testid="stSidebar"] span { color: #ffffff !important; }
+h1, h2, h3, h4, h5, h6 { color: #0b1f33 !important; font-weight: 700 !important; letter-spacing: -0.5px; }
+.stSlider [data-baseweb="slider"] div[role="slider"] { background-color: #0055a5 !important; border-color: #0055a5 !important; }
+.stSlider [data-baseweb="slider"] div > div > div > div { background-color: #0055a5 !important; }
+div.stMetric { background-color: #ffffff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); border-left: 4px solid #0055a5; }
+.stButton>button { background-color: #0055a5; color: white; border-radius: 6px; border: none; padding: 0.5rem 1rem; font-weight: 600; }
+.stButton>button:hover { background-color: #003d73; color: white; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -155,8 +105,50 @@ def kasko_model_egit(df_egitim):
     model.fit(X, y)
     return model
 
+
 # ---------------------------------------------------------
-# ANA SAYFA VE MODÜLLER
+# YENİ EKLENEN SAYFALAR
+# ---------------------------------------------------------
+def finansal_bilgi_sayfasi():
+    st.header("🌍 Makroekonomi & Finans Dünyası")
+    st.markdown("Finansal piyasaları anlamak, risk yönetimi ve makine öğrenmesi modellerinin temelini oluşturur. Bu ekranda küresel ekonomik göstergelerin etkileşimini inceleyebilirsiniz.")
+    
+    c1, c2, c3 = st.columns(3)
+    c1.metric("TCMB Politika Faizi", "%50.0", "Sabit", delta_color="off")
+    c2.metric("Küresel Enflasyon Eğilimi", "%3.2", "-0.1%", delta_color="inverse")
+    c3.metric("BIST 100 Volatilite Endeksi", "18.4", "+1.2", delta_color="inverse")
+
+    st.markdown("---")
+    st.subheader("Ekonomik Döngüler ve Aktüeryal Etkileri")
+    st.info("💡 **Enflasyonun Sigortacılığa Etkisi:** Yüksek enflasyon ortamında hasar maliyetleri (yedek parça, sağlık hizmetleri) artar. Bu durum, IBNR (Muallak Hasar) rezervlerinin eksik kalmasına ve şirketin teknik zarar yazmasına neden olabilir.")
+    
+    df_trend = pd.DataFrame({
+        'Yıl': [2019, 2020, 2021, 2022, 2023, 2024],
+        'Faiz Oranı': [12, 17, 14, 9, 42.5, 50],
+        'Ortalama Hasar Maliyeti Artışı': [15, 18, 45, 85, 65, 40]
+    })
+    fig = px.line(df_trend, x='Yıl', y=['Faiz Oranı', 'Ortalama Hasar Maliyeti Artışı'], title="Makro Göstergeler vs Hasar Maliyeti Trendi", markers=True)
+    st.plotly_chart(fig, width="stretch")
+
+def veri_analizi_sayfasi():
+    st.header("📈 Keşifçi Veri Analizi (EDA) Lab")
+    st.markdown("Makine öğrenmesi modelleri kurulmadan önce verinin anatomisinin anlaşılması kritik öneme sahiptir.")
+    
+    df = varsayilan_kasko_verisi_getir().head(5000)
+    
+    t1, t2 = st.tabs(["Veri Seti Özeti", "Korelasyon Matrisi"])
+    with t1:
+        st.write("Açık kaynaklı kasko veri setinden 5,000 satırlık örneklem:")
+        st.dataframe(df.describe())
+    with t2:
+        st.write("Sürücü özellikleri ile hasar frekansı arasındaki korelasyon ilişkisi:")
+        corr = df[['DrivAge', 'VehAge', 'VehPower', 'ClaimNb', 'Exposure']].corr()
+        fig = px.imshow(corr, text_auto=True, aspect="auto", color_continuous_scale='RdBu_r', title="Değişken Korelasyon Isı Haritası")
+        st.plotly_chart(fig, width="stretch")
+
+
+# ---------------------------------------------------------
+# ANA SAYFA VE MODÜLLER (SENİN ORİJİNAL KODLARIN)
 # ---------------------------------------------------------
 def ana_sayfa():
     st.title("Finansal Veri Bilimi & Aktüeryal Laboratuvarı")
@@ -216,6 +208,8 @@ def ibnr_sayfasi():
             ibnr = nihai_hasar - odenen_hasar
             
             st.metric("Hesaplanan Toplam IBNR Rezervi", f"{ibnr:,.2f} TL")
+            # VERİTABANI KAYDI EKLENDİ
+            kayit_ekle("IBNR Rezervi", "Chain Ladder Projeksiyonu", f"{ibnr:,.2f} TL")
             
             fig = go.Figure()
             for index, row in df_proj.iterrows():
@@ -248,6 +242,8 @@ def hayat_sigortasi_sayfasi():
             m1, m2 = st.columns(2)
             m1.metric("Hayat Sigortası Net Tek Prim", f"{nsp:,.2f} TL")
             m2.metric("Aylık Emeklilik Maaşı (Anüite)", f"{anuite:,.2f} TL")
+            # VERİTABANI KAYDI EKLENDİ
+            kayit_ekle("Hayat Sigortası", f"Yaş: {yas}, Cinsiyet: {cinsiyet}, Teminat: {teminat}", f"NSP: {nsp:,.2f} TL")
     with t2:
         st.latex(r"A_x = \sum_{t=0}^{\infty} v^{t+1} \cdot _{t}p_x \cdot q_{x+t}")
     with t3:
@@ -301,20 +297,17 @@ def hasar_frekans_sayfasi():
             
             kolonlar = df_sigorta.columns.tolist()
             
-            # --- OTOMATİK ALGILAMA ALGORİTMASI ---
             def otomatik_algila(anahtar_kelimeler, kolon_listesi):
                 for i, kolon in enumerate(kolon_listesi):
                     kolon_temiz = str(kolon).lower().replace(" ", "").replace("_", "")
                     if any(anahtar in kolon_temiz for anahtar in anahtar_kelimeler):
                         return i
-                return 0 # Bulamazsa varsayılan olarak ilk kolonu seçer
+                return 0 
 
             yas_index = otomatik_algila(['age', 'yaş', 'yas', 'driver'], kolonlar)
             hasar_index = otomatik_algila(['claim', 'hasar', 'adet', 'count', 'freq', 'nb'], kolonlar)
             exposure_index = otomatik_algila(['exp', 'exposure', 'süre', 'sure', 'duration', 'yıl', 'yil'], kolonlar)
-            # ------------------------------------
             
-            # Seçim kutularının (selectbox) varsayılan değerleri otomatik algılanan indeksler olacak
             c1, c2, c3 = st.columns(3)
             yas_kolonu = c1.selectbox("Sürücü Yaşı Sütunu", kolonlar, index=yas_index)
             hasar_kolonu = c2.selectbox("Hasar Adedi Sütunu", kolonlar, index=hasar_index)
@@ -325,7 +318,6 @@ def hasar_frekans_sayfasi():
         else:
             df_hesap = varsayilan_kasko_verisi_getir()
             
-        # Aktüeryal Hesaplama ve Görselleştirme Aşaması
         if 'Exposure' in df_hesap.columns and 'ClaimNb' in df_hesap.columns and 'DrivAge' in df_hesap.columns:
             
             toplam_hasar = df_hesap['ClaimNb'].sum()
@@ -368,6 +360,7 @@ def hasar_frekans_sayfasi():
         * **Ters Seçimin (Adverse Selection) Engellenmesi:** Şirketin yüksek riskli profiller için bir "güvenli liman" haline gelmesini önler.
         * **Kârlılık ve Büyüme Dengesi:** Aktüeryal portföy dağılımını optimize ederek şirketin teknik kâr marjını güvenceye alır.
         """)
+
 def monte_carlo_sayfasi():
     st.header("Monte Carlo ile Toplu Hasar Simülatörü")
     t1, t2, t3 = st.tabs(["📊 Uygulama Paneli", "📐 Kullanılan Matematiksel Model", "💼 İş Değeri"])
@@ -378,7 +371,10 @@ def monte_carlo_sayfasi():
             np.random.seed(42)
             sim_sonuclar = [np.sum(np.random.lognormal(mean=siddet_mu, sigma=1.2, size=np.random.poisson(frekans))) for _ in range(1000)]
             st.plotly_chart(px.histogram(sim_sonuclar, nbins=50, title="1 Yıllık Toplam Hasar Dağılımı (Aggregate Loss)"), width="stretch")
-            st.metric("%99 VaR (İflas Riski Sınırı)", f"{np.percentile(sim_sonuclar, 99):,.0f} TL")
+            var_99 = np.percentile(sim_sonuclar, 99)
+            st.metric("%99 VaR (İflas Riski Sınırı)", f"{var_99:,.0f} TL")
+            # VERİTABANI KAYDI EKLENDİ
+            kayit_ekle("Monte Carlo", f"Frekans: {frekans}, Mu: {siddet_mu}", f"VaR: {var_99:,.0f} TL")
     with t2:
         st.latex(r"S = \sum_{i=1}^{N} X_i \quad (N \sim Poisson, X \sim Lognormal)")
     with t3:
@@ -518,8 +514,15 @@ def black_scholes_sayfasi():
     t1, t2, t3 = st.tabs(["📊 Uygulama Paneli", "📐 Kullanılan Matematiksel Model", "💼 İş Değeri"])
     with t1:
         c1, c2 = st.columns(2)
-        with c1: S, K, T = st.number_input("Spot (S)", value=100.0), st.number_input("Strike (K)", value=100.0), st.slider("Vade", 0.05, 5.0, 1.0)
-        with c2: r, sigma, opt_tipi = st.slider("Faiz (%)", 1, 50, 15)/100, st.slider("Volatilite (%)", 5, 100, 25)/100, st.selectbox("Opsiyon Tipi", ["Call", "Put"])
+        with c1: 
+            S = st.number_input("Spot (S)", value=100.0)
+            K = st.number_input("Strike (K)", value=100.0)
+            T = st.slider("Vade", 0.05, 5.0, 1.0)
+        with c2: 
+            r = st.slider("Faiz (%)", 1, 50, 15)/100
+            sigma = st.slider("Volatilite (%)", 5, 100, 25)/100
+            opt_tipi = st.selectbox("Opsiyon Tipi", ["Call", "Put"])
+        
         d1 = (np.log(S / K) + (r + 0.5 * sigma**2) * T) / (sigma * np.sqrt(T))
         d2 = d1 - sigma * np.sqrt(T)
         from math import erf
@@ -539,20 +542,32 @@ def kredi_var_sayfasi():
     with t1:
         portfoy = st.number_input("Kredi Portföyü (TL)", value=50000000)
         z_skor = 1.65 if "%95" in st.selectbox("Güven Aralığı", ["%95", "%99"]) else 2.33
-        st.metric("10 Günlük Portföy VaR", f"{portfoy * z_skor * 0.12 / np.sqrt(252) * np.sqrt(10):,.0f} TL")
+        var_degeri = portfoy * z_skor * 0.12 / np.sqrt(252) * np.sqrt(10)
+        st.metric("10 Günlük Portföy VaR", f"{var_degeri:,.0f} TL")
     with t2:
         st.latex(r"VaR = V_p \cdot z_{\alpha} \cdot \sigma_p \cdot \sqrt{T}")
     with t3:
         st.markdown("Yönetim kurulunun risk iştahını matematiksel olarak sınırlandırır.")
 
+
+# --- DİNAMİKLEŞTİRİLMİŞ ML SAYFALARI (YENİ) ---
 def fraud_sayfasi():
     st.header("ML Hasar Suistimali (Fraud) Uyarı Sistemi")
     t1, t2, t3 = st.tabs(["📊 Uygulama Paneli", "📐 Kullanılan Matematiksel Model", "💼 İş Değeri"])
     with t1:
-        hasar_saati, police_yasi = st.slider("Hasar Saati", 0, 24, 2), st.slider("Poliçe Yaşı", 1, 365, 10)
-        skor = 0.85 if (hasar_saati < 5 and police_yasi < 15) else 0.15
-        st.metric("Fraud Olasılık Skoru", f"%{skor*100}")
-        if skor > 0.5: st.error("⚠️ İnceleme Gerekli!")
+        hasar_saati = st.slider("Hasar Saati", 0, 24, 2)
+        police_yasi = st.slider("Poliçe Yaşı", 1, 365, 10)
+        # Dinamik Formül Eklendi
+        skor = 0.85 if (hasar_saati < 5 and police_yasi < 15) else (0.15 + (hasar_saati/100))
+        st.metric("Fraud Olasılık Skoru", f"%{skor*100:.1f}")
+        
+        if skor > 0.5: 
+            st.error("⚠️ İnceleme Gerekli!")
+            
+        if st.button("Sisteme Kaydet"):
+            kayit_ekle("Fraud Modeli", f"Saat: {hasar_saati}, Yaş: {police_yasi}", f"%{skor*100:.1f} Risk")
+            st.success("Loglandı.")
+            
     with t2:
         st.latex(r"P(Y=1) = \frac{1}{1 + e^{-(\beta_0 + \beta_1 X_1 + \dots)}}")
     with t3:
@@ -573,8 +588,16 @@ def kredi_risk_sayfasi():
     st.header("Otomatik Kredi Risk Skorlama")
     t1, t2, t3 = st.tabs(["📊 Uygulama Paneli", "📐 Kullanılan Matematiksel Model", "💼 İş Değeri"])
     with t1:
-        st.number_input("Aylık Gelir (TL)", value=45000)
-        st.metric("Temerrüt (Default) Olasılığı", "%35.0")
+        gelir = st.number_input("Aylık Gelir (TL)", min_value=10000, value=45000, step=5000)
+        borc = st.number_input("Mevcut Kredi Borcu (TL)", min_value=0, value=15000, step=5000)
+        
+        # Dinamik Formül
+        risk_skoru = min(99.0, (borc / gelir) * 100 * 1.5)
+        st.metric("Temerrüt (Default) Olasılığı", f"%{risk_skoru:.1f}")
+        
+        if st.button("Riski Kaydet"):
+            kayit_ekle("Kredi Risk Skoru", f"Gelir: {gelir}, Borç: {borc}", f"%{risk_skoru:.1f}")
+            st.success("Veritabanına kaydedildi.")
     with t2:
         st.latex(r"PD = P(\text{Default}=1 | \text{Gelir, Borç Oranı})")
     with t3:
@@ -584,8 +607,16 @@ def churn_sayfasi():
     st.header("Müşteri Kaybı (Churn) Erken Uyarı Sistemi")
     t1, t2, t3 = st.tabs(["📊 Uygulama Paneli", "📐 Kullanılan Matematiksel Model", "💼 İş Değeri"])
     with t1:
-        st.slider("Kredi Skoru", 350, 850, 650)
-        st.metric("Terk (Churn) Olasılığı", "%22.5")
+        kredi_skoru = st.slider("Kredi Skoru", 350, 850, 650)
+        aktif_yil = st.slider("Müşterilik Süresi (Yıl)", 1, 20, 3)
+        
+        # Dinamik Formül
+        churn_prob = max(1.0, min(99.0, 100 - (kredi_skoru / 10) - (aktif_yil * 2)))
+        st.metric("Terk (Churn) Olasılığı", f"%{churn_prob:.1f}")
+        
+        if st.button("Analizi Kaydet"):
+            kayit_ekle("Churn Skoru", f"Skor: {kredi_skoru}, Yıl: {aktif_yil}", f"%{churn_prob:.1f}")
+            st.success("Veritabanına kaydedildi.")
     with t2:
         st.latex(r"P(\text{Churn}=1) = f(X_{\text{Müşteri Davranışı}})")
     with t3:
@@ -602,32 +633,64 @@ def clv_sayfasi():
     with t3:
         st.markdown("Pazarlama ROI (Yatırım Getirisi) optimizasyonunu sağlar.")
 
+# ---------------------------------------------------------
+# SİSTEM VE İLETİŞİM SAYFALARI (GÜNCELLENDİ)
+# ---------------------------------------------------------
 def veritabani_sayfasi():
     st.header("SQLite Veritabanı Geçmişi")
+    st.info("Uygulama genelinde butonlara basılarak yapılan hesaplamalar buraya loglanmaktadır.")
     st.dataframe(gecmisi_getir(), width='stretch')
 
 def hakkinda_sayfasi():
     st.header("Proje Sahibi & Portfolyo Vitrini")
-    st.markdown("""
-    Merhaba! Ben **Sultan Kuş**. 
-    Veri bilimi, finansal risk analitiği ve aktüerya alanlarında karar destek sistemleri geliştiriyorum.
     
-    Bu Süper Platform; teorik matematik modellerinin iş süreçlerine nasıl değer kattığını kanıtlayan bir vitrindir.
+    col1, col2 = st.columns([1, 3])
+    with col1:
+        # Profil Fotoğrafı (Eğer kendi fotoğrafın varsa 'avatar.png' olarak projeye ekleyip burayı güncelleyebilirsin)
+        st.image("https://cdn-icons-png.flaticon.com/512/3135/3135715.png", width=180)
+    with col2:
+        st.markdown("""
+        Merhaba! Ben **Sultan Kuş**. 
+        Matematik altyapımla veri bilimi, finansal risk analitiği ve karar destek sistemleri geliştiriyorum.
+        
+        Bu Süper Platform; teorik matematik modellerinin, makine öğrenmesinin ve veri analizinin iş süreçlerine nasıl değer kattığını kanıtlayan dinamik bir vitrindir.
+        
+        * **📧 Email:** [kussultannn34@gmail.com](mailto:kussultannn34@gmail.com)
+        * **💼 LinkedIn:** [linkedin.com/in/sultan-kuş](https://www.linkedin.com/in/sultan-kuş/)
+        * **💻 GitHub:** [github.com/SultanKus](https://github.com/SultanKus)
+        """)
     
-    ---
-    ### 📬 İletişime Geçin
-    Projelerim ve iş birlikleri için kanallarım:
-    
-    * **📧 Email:** [kussultannn34@gmail.com](mailto:kussultannn34@gmail.com)
-    * **💼 LinkedIn:** [linkedin.com/in/sultan-kuş](https://www.linkedin.com/in/sultan-kuş/)
-    * **💻 GitHub:** [github.com/SultanKus](https://github.com/SultanKus)
-    """)
+    st.markdown("---")
+    st.subheader("📄 Özgeçmiş (CV)")
+    # CV İndirme Butonu
+    try:
+        with open("Sultan_Kus_CV.pdf", "rb") as pdf_file:
+            st.download_button(
+                label="Özgeçmişimi İndir (PDF)",
+                data=pdf_file,
+                file_name="Sultan_Kus_CV.pdf",
+                mime="application/pdf"
+            )
+    except FileNotFoundError:
+        st.warning("⚠️ 'Sultan_Kus_CV.pdf' dosyası proje klasöründe bulunamadı. Lütfen CV dosyanızı proje klasörüne ekleyin.")
+
 
 # ---------------------------------------------------------
-# STREAMLIT NAVIGASYON
+# YENİ STREAMLIT NAVIGASYON YAPISI
 # ---------------------------------------------------------
 pg = st.navigation({
-    "Genel Bakış": [st.Page(ana_sayfa, title="Ana Sayfa", icon="🏠")],
+    "Genel Bakış & Bilgi": [
+        st.Page(ana_sayfa, title="Ana Sayfa", icon="🏠"),
+        st.Page(finansal_bilgi_sayfasi, title="Makroekonomi & Finans", icon="🌍")
+    ],
+    "Veri & Makine Öğrenmesi": [
+        st.Page(veri_analizi_sayfasi, title="Keşifçi Veri Analizi (EDA)", icon="📈"),
+        st.Page(kredi_risk_sayfasi, title="Kredi Risk Skorlama", icon="🏦"),
+        st.Page(churn_sayfasi, title="Churn Tahmini", icon="🚪"),
+        st.Page(fraud_sayfasi, title="Fraud Uyarı Sistemi", icon="🕵️"),
+        st.Page(telematik_sayfasi, title="Telematik Risk Skorlama", icon="🚗"),
+        st.Page(clv_sayfasi, title="Müşteri Yaşam Değeri", icon="💎")
+    ],
     "📊 Aktüerya & İleri Sigortacılık": [
         st.Page(ibnr_sayfasi, title="IBNR Muallak Hasar", icon="📐"),
         st.Page(hayat_sigortasi_sayfasi, title="Hayat Sigortası Fiyatlama", icon="👨‍🦳"),
@@ -649,13 +712,6 @@ pg = st.navigation({
         st.Page(reasurans_sayfasi, title="Dinamik Reasürans", icon="🌐"),
         st.Page(black_scholes_sayfasi, title="Black-Scholes", icon="📈"),
         st.Page(kredi_var_sayfasi, title="Kredi Portföyü VaR", icon="📉")
-    ],
-    "🤖 Yapay Zeka & Skorlama": [
-        st.Page(fraud_sayfasi, title="Fraud Uyarı Sistemi", icon="🕵️"),
-        st.Page(telematik_sayfasi, title="Telematik Risk Skorlama", icon="🚗"),
-        st.Page(kredi_risk_sayfasi, title="Kredi Risk Skorlama", icon="🏦"),
-        st.Page(churn_sayfasi, title="Churn Tahmini", icon="🚪"),
-        st.Page(clv_sayfasi, title="Müşteri Yaşam Değeri", icon="💎")
     ],
     "Sistem & İletişim": [
         st.Page(veritabani_sayfasi, title="Veritabanı Geçmişi", icon="📂"),
