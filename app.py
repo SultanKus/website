@@ -12,6 +12,7 @@ from datetime import datetime
 import yfinance as yf
 import requests
 from math import erf
+from scipy.optimize import minimize
 
 # ---------------------------------------------------------
 # SAYFA YAPILANDIRMASI VE CSS STİLİ
@@ -231,6 +232,50 @@ def fraud_modelini_egit():
     auc = roc_auc_score(y_test, y_prob)
     f1 = f1_score(y_test, (y_prob > 0.5).astype(int))
     return model, auc, f1
+
+# ---------------------------------------------------------
+# GERÇEK PORTFÖY OPTİMİZASYONU (Markowitz / Karesel Programlama)
+# ---------------------------------------------------------
+@st.cache_data(ttl=3600)
+def markowitz_veri_getir(hisseler, periyot="2y"):
+    """Canlı fiyat verisinden yıllıklandırılmış beklenen getiri ve kovaryans matrisini hesaplar."""
+    fiyatlar = pd.DataFrame()
+    for h in hisseler:
+        veri = yf.Ticker(h).history(period=periyot)['Close']
+        if not veri.empty:
+            fiyatlar[h] = veri
+    fiyatlar = fiyatlar.dropna()
+    getiriler = fiyatlar.pct_change().dropna()
+    ort_getiri = getiriler.mean() * 252
+    kovaryans = getiriler.cov() * 252
+    return ort_getiri, kovaryans
+
+def _portfoy_varyansi(agirliklar, kovaryans):
+    return agirliklar @ kovaryans.values @ agirliklar
+
+def min_varyans_agirliklari(kovaryans, hedef_getiri, ort_getiri):
+    """Belirli bir hedef getiriyi sağlayan minimum varyanslı portföyü SLSQP (Sequential Least Squares
+    Quadratic Programming) ile çözer — KKT koşullarını sayısal olarak sağlayan gerçek bir optimizasyondur."""
+    n = len(ort_getiri)
+    kisitlar = [
+        {'type': 'eq', 'fun': lambda w: np.sum(w) - 1},
+        {'type': 'eq', 'fun': lambda w: np.dot(w, ort_getiri) - hedef_getiri},
+    ]
+    sinirlar = tuple((0.0, 1.0) for _ in range(n))  # açığa satış yok
+    sonuc = minimize(_portfoy_varyansi, x0=np.repeat(1 / n, n), args=(kovaryans,),
+                      method='SLSQP', bounds=sinirlar, constraints=kisitlar)
+    return sonuc.x if sonuc.success else None
+
+def maksimum_sharpe_agirliklari(kovaryans, ort_getiri, risksiz_oran=0.30):
+    n = len(ort_getiri)
+    def negatif_sharpe(w):
+        getiri = np.dot(w, ort_getiri)
+        risk = np.sqrt(w @ kovaryans.values @ w)
+        return -(getiri - risksiz_oran) / risk if risk > 0 else 0
+    kisitlar = [{'type': 'eq', 'fun': lambda w: np.sum(w) - 1}]
+    sinirlar = tuple((0.0, 1.0) for _ in range(n))
+    sonuc = minimize(negatif_sharpe, x0=np.repeat(1 / n, n), method='SLSQP', bounds=sinirlar, constraints=kisitlar)
+    return sonuc.x if sonuc.success else None
 
 # ---------------------------------------------------------
 # CANLI PİYASA VERİSİ (yfinance)
@@ -906,30 +951,119 @@ olarak keşfetmeyi sağlıyor.
 def stres_testi_sayfasi():
     st.header("Aktüeryal Stres Testi ve Duyarlılık Matrisi")
     demo_rozeti()
+    egitim_notu("""
+**Stres testi, bir modelin çıktısı değil, "ne olursa ne olur?" sorusuna verilen sistematik bir cevaptır**
+(senaryo analizi). Solvency II ve BDDK regülasyonları, şirketlerden düzenli olarak "aşırı ama makul" (severe
+but plausible) senaryolar altında sermaye yeterliliğini test etmesini ister — örn. "enflasyon %20 artarsa,
+faiz 5 puan düşerse ne olur?".
+
+**Neden önemli?** Ortalama/beklenen senaryo altında sağlıklı görünen bir şirket, kuyruk (tail) senaryolarında
+iflas edebilir. Bu sayfadaki formül basitleştirilmiş bir duyarlılık fonksiyonudur; gerçek stres testleri
+genelde tarihsel kriz senaryolarının (2008, 2018 kur şoku vb.) tekrar oynatılmasına (historical scenario
+replay) veya çok değişkenli Monte Carlo simülasyonlarına dayanır.
+""")
     enflasyon_soku = st.slider("Enflasyon Artış Şoku (%)", 0, 50, 20)
     faiz_soku = st.slider("Faiz Oranı Değişim Şoku (%)", -20, 20, 5)
     simule_kar = 10000000 * (1 + (faiz_soku / 100) - (enflasyon_soku / 100) * 1.5)
     st.metric("Simüle Edilen Net Teknik Kâr / Zarar", f"{simule_kar:,.0f} TL")
     st.latex(r"\Delta \text{Kâr} = f(\Delta \text{Faiz}, \Delta \text{Enflasyon})")
 
+def murabaha_hesaplayici():
+    st.subheader("🕌 Murabaha (Maliyet+Kâr Satışı) Hesaplayıcı")
+    st.markdown(
+        '<div class="model-badge">✅ Gerçek katılım bankacılığı ürün formülü — faizsiz finansmanın temel yapısıdır</div>',
+        unsafe_allow_html=True
+    )
+    egitim_notu("""
+**Murabaha nedir?** Faizli kredide banka size doğrudan para (faizle) verir; Murabaha'da ise banka **malın
+kendisini** satıcıdan peşin alır, size (genelde vadeli ve şeffaf bir kâr marjıyla) satar. Fark kritik:
+para değil, mal alınıp satılıyor — bu yüzden "faiz" değil "kâr" olarak adlandırılır ve katılım bankacılığının
+en yaygın finansman yöntemidir (araç, konut, ticari mal finansmanı).
+
+**Formül:** `Satış Bedeli = Mal Bedeli × (1 + Kâr Oranı × Vade/12)`, taksitler bu toplamın vadeye eşit
+bölünmesiyle bulunur (bazı ürünlerde azalan bakiye yöntemi de kullanılır, burada sabit taksit varsayılıyor).
+""")
+    c1, c2 = st.columns(2)
+    with c1:
+        mal_bedeli = st.number_input("Mal/Varlık Bedeli (TL)", 10000, 5000000, 500000, step=10000)
+        kar_orani = st.slider("Yıllık Kâr Oranı (%)", 1.0, 60.0, 35.0)
+    with c2:
+        vade_ay = st.slider("Vade (Ay)", 3, 120, 24)
+    toplam_kar = mal_bedeli * (kar_orani / 100) * (vade_ay / 12)
+    satis_bedeli = mal_bedeli + toplam_kar
+    aylik_taksit = satis_bedeli / vade_ay
+    m1, m2, m3 = st.columns(3)
+    m1.metric("Toplam Kâr Tutarı", f"{toplam_kar:,.0f} TL")
+    m2.metric("Toplam Satış Bedeli", f"{satis_bedeli:,.0f} TL")
+    m3.metric("Aylık Taksit", f"{aylik_taksit:,.0f} TL")
+    if st.button("Murabaha Hesabını Kaydet"):
+        kayit_ekle("Murabaha Hesaplama", f"Mal:{mal_bedeli}, Kâr%:{kar_orani}, Vade:{vade_ay}ay", f"Taksit: {aylik_taksit:,.0f} TL")
+        st.success("Kaydedildi.")
+
+def sukuk_degerleme():
+    st.subheader("🕌 İcara Sukuk Değerleme (Kira Sertifikası)")
+    egitim_notu("""
+**Sukuk nedir?** Tahvilin faizsiz karşılığıdır. Klasik tahvilde yatırımcı borç verir ve faiz alır; İcara
+Sukuk'ta yatırımcı bir varlığın (bina, uçak vb.) **ortak sahibi** olur ve o varlığın kira gelirinden düzenli
+"kira payı" alır — vade sonunda varlık ihraççıya geri satılır (nominal değer ödenir).
+
+**Değerleme mantığı, tahvil fiyatlamasıyla matematiksel olarak aynıdır** (bugünkü değer/present value):
+periyodik kira ödemeleri ve vade sonu nominal değer, beklenen kâr oranıyla iskonto edilip toplanır.
+""")
+    st.latex(r"P = \sum_{t=1}^{n} \frac{\text{Kira Ödemesi}_t}{(1+r)^t} + \frac{\text{Nominal Değer}}{(1+r)^n}")
+    c1, c2 = st.columns(2)
+    with c1:
+        nominal = st.number_input("Nominal Değer (TL)", 1000, 1000000, 100000, step=1000, key="sukuk_nominal")
+        kira_orani = st.slider("Yıllık Kira Getiri Oranı (%)", 1.0, 60.0, 32.0, key="sukuk_kira")
+    with c2:
+        vade_yil = st.slider("Vade (Yıl)", 1, 10, 3, key="sukuk_vade")
+        iskonto_orani = st.slider("Beklenen Piyasa Kâr Oranı (%)", 1.0, 60.0, 34.0, key="sukuk_iskonto",
+                                   help="Piyasadaki benzer risk profilli araçların beklenen getirisi; sukuk'un fiyatını belirler.")
+    yillik_kira = nominal * (kira_orani / 100)
+    pv = sum(yillik_kira / (1 + iskonto_orani / 100) ** t for t in range(1, vade_yil + 1))
+    pv += nominal / (1 + iskonto_orani / 100) ** vade_yil
+    m1, m2 = st.columns(2)
+    m1.metric("Yıllık Kira Ödemesi", f"{yillik_kira:,.0f} TL")
+    m2.metric("Sukuk'un Bugünkü Değeri", f"{pv:,.0f} TL")
+    if pv > nominal:
+        st.info("💡 Bugünkü değer nominalin üzerinde — kira oranı, piyasa beklentisinden yüksek (sukuk primli işlem görür).")
+    elif pv < nominal:
+        st.info("💡 Bugünkü değer nominalin altında — kira oranı, piyasa beklentisinden düşük (sukuk iskontolu işlem görür).")
+
 def katilim_fon_sayfasi():
-    st.header("Katılım Emeklilik & Faizsiz Yatırım Fonları Takip Aracı")
-    demo_rozeti("Fon getirileri rastgele üretilmiştir; gerçek fon verisi değildir.")
-    tarihler = pd.date_range(start='2025-01-01', periods=60, freq='W')
-    rng = np.random.default_rng(42)
-    df_fonlar = pd.DataFrame({
-        'Tarih': tarihler,
-        'Hisse Katılım': 100 * (1 + rng.normal(0.003, 0.02, 60)).cumprod(),
-        'Altın Katılım': 100 * (1 + rng.normal(0.0025, 0.012, 60)).cumprod(),
-        'Sukuk Fonu': 100 * (1 + rng.normal(0.0015, 0.004, 60)).cumprod()
-    })
-    secilenler = st.multiselect("Fonları Seçin", ['Hisse Katılım', 'Altın Katılım', 'Sukuk Fonu'], default=['Hisse Katılım'])
-    if secilenler:
-        st.plotly_chart(px.line(df_fonlar, x='Tarih', y=secilenler, title="Performans Kıyaslaması (Baz: 100 TL, simüle)"), width='stretch')
+    st.header("Katılım Bankacılığı Araçları")
+    t1, t2, t3 = st.tabs(["🕌 Murabaha Hesaplayıcı", "🕌 Sukuk Değerleme", "📊 Fon Performans Karşılaştırma (Demo)"])
+    with t1:
+        murabaha_hesaplayici()
+    with t2:
+        sukuk_degerleme()
+    with t3:
+        demo_rozeti("Fon getirileri rastgele üretilmiştir; gerçek fon verisi değildir.")
+        tarihler = pd.date_range(start='2025-01-01', periods=60, freq='W')
+        rng = np.random.default_rng(42)
+        df_fonlar = pd.DataFrame({
+            'Tarih': tarihler,
+            'Hisse Katılım': 100 * (1 + rng.normal(0.003, 0.02, 60)).cumprod(),
+            'Altın Katılım': 100 * (1 + rng.normal(0.0025, 0.012, 60)).cumprod(),
+            'Sukuk Fonu': 100 * (1 + rng.normal(0.0015, 0.004, 60)).cumprod()
+        })
+        secilenler = st.multiselect("Fonları Seçin", ['Hisse Katılım', 'Altın Katılım', 'Sukuk Fonu'], default=['Hisse Katılım'])
+        if secilenler:
+            st.plotly_chart(px.line(df_fonlar, x='Tarih', y=secilenler, title="Performans Kıyaslaması (Baz: 100 TL, simüle)"), width='stretch')
 
 def alm_nakit_sayfasi():
     st.header("ALM Nakit Akışı Eşitleme")
     demo_rozeti()
+    egitim_notu("""
+**ALM (Asset-Liability Management / Varlık-Yükümlülük Yönetimi), bir şirketin varlıklarından gelecek nakit
+akışlarının, yükümlülüklerinden çıkacak nakit akışlarını her dönemde karşılayıp karşılamadığını kontrol eder.**
+Bu, kâr/zarar tablosundan farklı bir bakış açısıdır — şirket kâğıt üzerinde kârlı görünse bile, belirli bir
+yılda elindeki nakit, o yıl ödemesi gereken tazminatı karşılamıyorsa **likidite krizi** yaşar.
+
+**Sigorta şirketleri için özel önemi:** Hayat sigortası ve emeklilik gibi uzun vadeli yükümlülüklerde, varlık
+portföyünün (tahvil, hisse vb.) getiri zamanlaması, yükümlülük ödeme zamanlamasıyla eşleşmelidir. Bu sayfadaki
+kısıt (`Varlık Nakit Akışı ≥ Yükümlülük Nakit Akışı`), her dönem için ayrı ayrı sağlanmalıdır.
+""")
     yil_1_yuk = st.number_input("1. Yıl Tazminat Yükü (TL)", 1000000, 50000000, 15000000)
     faiz_orani = st.slider("Piyasa Getirisi (%)", 5, 50, 25)
     varlik_tahvil = st.number_input("Tahvil Portföyü (TL)", 10000000, 100000000, 60000000)
@@ -943,6 +1077,17 @@ def alm_nakit_sayfasi():
 def alm_durasyon_sayfasi():
     st.header("ALM Durasyon Eşleştirme Simülatörü")
     demo_rozeti()
+    egitim_notu("""
+**Durasyon (Macaulay Duration), bir nakit akışı setinin faiz oranı değişimlerine ne kadar duyarlı olduğunu**
+tek bir sayıyla özetler — kabaca, "ağırlıklı ortalama vade" olarak düşünülebilir. Uzun durasyonlu bir varlık/
+yükümlülük, faiz değiştiğinde değeri daha çok değişir.
+
+**Neden önemli?** Bir sigorta şirketinin varlıklarının durasyonu ile yükümlülüklerinin durasyonu birbirinden
+çok farklıysa, faiz oranları değiştiğinde ikisinin değeri **farklı hızda** değişir ve aradaki fark (surplus/
+açık) büyür — buna **durasyon uyumsuzluğu (duration mismatch)** denir. "Durasyon eşleştirme" (immunization)
+stratejisi, bu ikisini birbirine yakın tutarak bilançoyu faiz şoklarına karşı korumayı hedefler; bu sayfa,
+farklı katsayılarla (4.5 vs 6.2) bu duyarlılık farkını gösteriyor.
+""")
     f_orani = st.slider("Piyasa Faiz Oranı Şoku (%)", -5.0, 5.0, 0.0)
     v_deger = 100000000 * (1 - 4.5 * (f_orani / 100))
     y_deger = 90000000 * (1 - 6.2 * (f_orani / 100))
@@ -950,17 +1095,92 @@ def alm_durasyon_sayfasi():
     st.latex(r"D_{Mac} = \frac{\sum_{t=1}^{T} \frac{t \cdot CF_t}{(1+y)^t}}{\sum_{t=1}^{T} \frac{CF_t}{(1+y)^t}}")
 
 def markowitz_sayfasi():
-    st.header("Markowitz Etkin Sınır (Efficient Frontier)")
-    demo_rozeti("Rastgele üretilmiş getiri/risk noktalarıdır; gerçek portföy optimizasyonu değildir.")
-    if st.button("Rastgele Portföy Simüle Et"):
-        rng = np.random.default_rng(42)
-        getiri, risk = rng.normal(0.20, 0.10, 1000), rng.normal(0.15, 0.05, 1000)
-        st.plotly_chart(px.scatter(x=risk, y=getiri, color=getiri / risk), width="stretch")
-    st.latex(r"\sigma_p^2 = \sum_{i} \sum_{j} w_i w_j Cov(R_i, R_j)")
+    st.header("Markowitz Etkin Sınır — Canlı Veriyle Gerçek Portföy Optimizasyonu")
+    st.markdown(
+        '<div class="model-badge">✅ Karesel programlama (SLSQP) ile çözülen gerçek optimizasyon — canlı Yahoo Finance verisi kullanır</div>',
+        unsafe_allow_html=True
+    )
+    egitim_notu("""
+**Bu artık simülasyon değil, gerçek bir kısıtlı optimizasyon problemidir.** Modern Portföy Teorisi'nin (Markowitz,
+1952) temel sorusu: "Belirli bir hedef getiriyi sağlayan, en düşük riskli (varyanslı) hisse ağırlık kombinasyonu
+nedir?"
+
+**Matematiksel yapı:** Portföy varyansı, ağırlıklar (`w`) ve kovaryans matrisi (`Σ`) cinsinden `w^T Σ w`
+şeklinde **karesel (quadratic)** bir fonksiyondur. Bunu, `Σw=1` (ağırlıklar toplamı 1) ve `w·μ=hedef getiri`
+kısıtları altında minimize ediyoruz. Bu tam olarak bir **Karesel Programlama (Quadratic Programming)**
+problemidir; `scipy.optimize.minimize` içindeki **SLSQP** algoritması, KKT (Karush-Kuhn-Tucker) koşullarını
+sayısal olarak çözerek optimal ağırlıkları buluyor.
+
+**Efficient Frontier (Etkin Sınır):** Farklı hedef getiriler için bu optimizasyonu tekrarlayıp risk-getiri
+noktalarını çizdiğimizde ortaya çıkan eğridir — eğrinin altında kalan hiçbir portföy, aynı riskte daha yüksek
+getiri sağlayamaz.
+
+**Sharpe Oranı:** `(Portföy Getirisi − Risksiz Oran) / Portföy Riski` — birim risk başına elde edilen fazla
+getiriyi ölçer; Maksimum Sharpe portföyü, etkin sınır üzerindeki "en verimli" noktadır.
+""")
+
+    etiketler = [f"{ad} ({sembol})" for sembol, ad in BIST_POPULER]
+    secilen_etiketler = st.multiselect("Optimize Edilecek Hisseler (en az 3 seçin)", etiketler, default=etiketler[:5])
+    hisse_listesi = [BIST_POPULER[etiketler.index(e)][0] for e in secilen_etiketler]
+    risksiz_oran = st.slider("Risksiz Faiz Oranı Varsayımı (%)", 5, 60, 30,
+                              help="Sharpe oranı hesaplaması için kullanılır; Türkiye'de genelde TCMB politika faizi baz alınır.") / 100
+
+    if len(hisse_listesi) >= 3 and st.button("Etkin Sınırı Hesapla"):
+        with st.spinner("Canlı veri çekiliyor ve optimizasyon çözülüyor..."):
+            ort_getiri, kovaryans = markowitz_veri_getir(hisse_listesi)
+            if len(ort_getiri) < 3:
+                st.error("Yeterli veri çekilemedi, farklı hisseler deneyin.")
+            else:
+                hedef_araligi = np.linspace(ort_getiri.min(), ort_getiri.max() * 0.98, 30)
+                sonuclar = []
+                for hg in hedef_araligi:
+                    w = min_varyans_agirliklari(kovaryans, hg, ort_getiri.values)
+                    if w is not None:
+                        risk = np.sqrt(w @ kovaryans.values @ w)
+                        sonuclar.append((risk, hg))
+                if sonuclar:
+                    riskler, getiriler_egri = zip(*sonuclar)
+                    fig = go.Figure()
+                    fig.add_trace(go.Scatter(x=list(riskler), y=list(getiriler_egri), mode='lines+markers',
+                                              name='Etkin Sınır', line=dict(color='#0055a5')))
+
+                    w_sharpe = maksimum_sharpe_agirliklari(kovaryans, ort_getiri.values, risksiz_oran)
+                    if w_sharpe is not None:
+                        r_sh = np.dot(w_sharpe, ort_getiri.values)
+                        risk_sh = np.sqrt(w_sharpe @ kovaryans.values @ w_sharpe)
+                        fig.add_trace(go.Scatter(x=[risk_sh], y=[r_sh], mode='markers',
+                                                  marker=dict(color='red', size=14, symbol='star'),
+                                                  name='Maksimum Sharpe Portföyü'))
+                    fig.update_layout(title="Etkin Sınır (Yıllıklandırılmış Risk vs Getiri)",
+                                       xaxis_title="Risk (Std. Sapma)", yaxis_title="Beklenen Getiri")
+                    st.plotly_chart(fig, width='stretch')
+
+                    if w_sharpe is not None:
+                        st.subheader("⭐ Maksimum Sharpe Portföyü Ağırlıkları")
+                        agirlik_df = pd.DataFrame({'Hisse': hisse_listesi, 'Ağırlık (%)': (w_sharpe * 100).round(2)})
+                        agirlik_df = agirlik_df[agirlik_df['Ağırlık (%)'] > 0.1].sort_values('Ağırlık (%)', ascending=False)
+                        st.dataframe(agirlik_df, width='stretch', hide_index=True)
+                        c1, c2 = st.columns(2)
+                        c1.metric("Beklenen Yıllık Getiri", f"%{r_sh * 100:.1f}")
+                        c2.metric("Beklenen Yıllık Risk", f"%{risk_sh * 100:.1f}")
+                        kayit_ekle("Markowitz Optimizasyonu", f"{len(hisse_listesi)} hisse", f"Sharpe getiri: %{r_sh*100:.1f}")
+                else:
+                    st.warning("Optimizasyon bu hisse kombinasyonu için çözüm bulamadı.")
+    st.latex(r"\min_w\ w^T \Sigma w \quad \text{s.t.} \quad \sum w_i = 1,\ \ w^T \mu = \text{hedef getiri},\ \ w_i \ge 0")
 
 def varlik_dagilimi_sayfasi():
     st.header("Varlık Dağılım Simülatörü")
-    demo_rozeti()
+    demo_rozeti("Elle girilen ağırlıkları görselleştirir; Markowitz sayfasındaki gibi optimize etmez.")
+    egitim_notu("""
+**Bu sayfa bir optimizasyon değil, "ne görürsün" görselleştirmesidir** — Kantitatif Finans segmentindeki
+Markowitz sayfası, ağırlıkları matematiksel olarak optimize ederken, burada kullanıcı ağırlıkları elle girip
+sonucu görür.
+
+**Neden varlık dağılımı önemli?** Akademik çalışmalar (Brinson vd.), bir portföyün uzun vadeli getiri
+değişkenliğinin büyük kısmının, hangi hisseyi seçtiğinizden çok, **hangi varlık sınıflarına ne oranda
+yatırım yaptığınızdan** (asset allocation) kaynaklandığını gösterir. Bu yüzden kurumsal portföy yönetiminde
+"hangi hisse" sorusundan önce "hisse/tahvil/altın dengesi ne olmalı" sorusu sorulur.
+""")
     w_hisse = st.slider("Hisse (%)", 0, 100, 50)
     w_tahvil = st.slider("Tahvil (%)", 0, 100, 30)
     w_altin = st.slider("Altın (%)", 0, 100, 20)
@@ -972,6 +1192,17 @@ def varlik_dagilimi_sayfasi():
 def benchmark_sayfasi():
     st.header("Piyasa Kıyaslama (Benchmark)")
     demo_rozeti()
+    egitim_notu("""
+**Nominal getiri ile reel (enflasyondan arındırılmış) getiriyi karıştırmak, finansta en sık yapılan hatalardan
+biridir.** "%35 kazandım" cümlesi, enflasyon %40 ise aslında bir kayıptır. Formüldeki `Reel Getiri` hesabı
+tam olarak bunu düzeltir — nominal getiriyi enflasyon oranına bölerek "gerçek satın alma gücü" cinsinden
+getiriyi bulur (basit çıkarma — `Nominal − Enflasyon` — yüksek enflasyon dönemlerinde yanıltıcı olduğu için
+tercih edilmez).
+
+**Benchmark'ın (kıyaslama endeksinin) rolü:** Bir portföy yöneticisinin "başarılı" olup olmadığı, mutlak
+getiriyle değil, ilgili piyasa endeksine (örn. BIST 100) veya enflasyona göre **relatif performansla**
+değerlendirilir — bu, fon yönetimi endüstrisinde standart bir KPI'dır.
+""")
     portfoy_getiri = st.slider("Yıllık Getiri (%)", 0, 100, 35)
     enflasyon = st.slider("Enflasyon (%)", 0, 80, 25)
     st.plotly_chart(px.bar(pd.DataFrame({'Endeks': ['Portföy', 'BIST 100', 'Enflasyon'], 'Getiri (%)': [portfoy_getiri, 28.5, enflasyon]}),
@@ -981,6 +1212,17 @@ def benchmark_sayfasi():
 def telematik_sayfasi():
     st.header("Telematik Tabanlı Risk Skorlama")
     demo_rozeti("Elle belirlenmiş ağırlıklarla kurulmuş bir skor formülüdür; eğitilmiş bir ML modeli değildir.")
+    egitim_notu("""
+**Telematik (Usage-Based Insurance / UBI), sigortayı "kim olduğun"dan (yaş, cinsiyet, meslek) "nasıl
+davrandığın"a kaydıran bir yaklaşımdır** — araca takılan bir cihaz veya mobil uygulama, ani fren, gece
+sürüşü, hız gibi gerçek sürüş verisini toplar.
+
+**Neden önemli?** Geleneksel fiyatlama (bu sitede Kasko GLM sayfasındaki gibi) demografik/araç özelliklerine
+dayanır ve **korelasyona** dayalıdır ("genç sürücüler istatistiksel olarak daha riskli"); telematik ise
+**doğrudan davranışı** ölçer, bu yüzden daha adil ve daha az riskli sürücüyü doğru fiyatlandırma potansiyeli
+sunar. Bu sayfadaki formül basit bir ağırlıklı skorlama; üretim sistemlerinde genelde bu ham sinyaller,
+Kasko GLM'deki gibi bir GLM'e ek değişken olarak beslenir (telematik skoru → prim çarpanı).
+""")
     ani_fren = st.slider("Ani Fren (adet/ay)", 0, 50, 12)
     gece_suruş = st.slider("Gece Sürüşü (%)", 0, 100, 45)
     skor = max(0, 100 - (ani_fren * 1.5) - (gece_suruş * 0.5))
@@ -990,6 +1232,16 @@ def telematik_sayfasi():
 def clv_sayfasi():
     st.header("Müşteri Yaşam Boyu Değeri (CLV)")
     demo_rozeti()
+    egitim_notu("""
+**CLV (Customer Lifetime Value), bir müşterinin şirketle olan ilişkisi boyunca yaratacağı toplam kârın bugünkü
+tahminidir** — pazarlama ve müşteri ilişkileri kararlarının temel finansal ölçütlerinden biridir.
+
+**Neden önemli?** Bir müşteriyi kazanmanın maliyeti (CAC — Customer Acquisition Cost) ile CLV karşılaştırılır:
+CLV, CAC'den anlamlı ölçüde yüksekse o kanal/segment kârlıdır. Bu formül basitleştirilmiş; gerçek CLV
+modellerinde genelde müşteri elde tutma olasılığı (survival/churn olasılığı — bu sitedeki Churn modülüyle
+doğrudan bağlantılı) ve zaman değeri (iskonto) de hesaba katılır, yani CLV ve Churn modelleri üretimde
+genelde birlikte çalışır.
+""")
     police_tutari = st.number_input("Poliçe Tutarı", value=4500.0)
     islem_sayisi = st.slider("Yıllık İşlem Sayısı", 1, 12, 2)
     omur = st.slider("Beklenen Müşteri Ömrü (Yıl)", 1, 20, 5)
@@ -1014,12 +1266,26 @@ def hakkinda_sayfasi():
     with col2:
         st.markdown("""
         Merhaba! Ben **Sultan Kuş**.
-        Matematik altyapımla veri bilimi, finansal risk analitiği ve karar destek sistemleri geliştiriyorum.
+        Matematik altyapımla finans, sigorta ve risk analitiği alanlarına yönelik veri bilimi çözümleri geliştiriyorum.
+        Hedefim; finans, sigorta ve **katılım bankacılığı** alanlarında, matematiksel titizliği veri bilimiyle
+        birleştiren bir rol.
 
         * **📧 Email:** [kussultannn34@gmail.com](mailto:kussultannn34@gmail.com)
         * **💼 LinkedIn:** [linkedin.com/in/sultan-kuş](https://www.linkedin.com/in/sultan-kuş/)
         * **💻 GitHub:** [github.com/SultanKus](https://github.com/SultanKus)
         """)
+    st.markdown("---")
+    st.subheader("🎯 Yetkinlik Haritası")
+    st.markdown("""
+| Alan | Yetkinlikler |
+|---|---|
+| **Matematik & İstatistik** | Olasılık Teorisi, Stokastik Süreçler, Doğrusal Cebir, Optimizasyon (Karesel Programlama), İstatistiksel Modelleme |
+| **Aktüerya & Risk** | IBNR (Chain Ladder), Solvency II, VaR, Poisson/GLM Frekans Modelleme, Aktüerlik Sınavına Hazırlık |
+| **Finansal Mühendislik** | Black-Scholes, Markowitz Portföy Optimizasyonu, Reasürans, Katılım Bankacılığı Ürünleri (Murabaha, Sukuk) |
+| **Makine Öğrenmesi** | Lojistik Regresyon, Poisson Regresyonu, Model Doğrulama (AUC, F1), Scikit-learn |
+| **Yazılım & Araçlar** | Python, SQL, Streamlit, Plotly, Git/GitHub, Excel (İleri Düzey), SAP |
+""")
+    st.caption("Bu tablo, proje boyunca fiilen uygulanan yöntemlere dayanır — her satır, sitedeki ilgili modülle doğrulanabilir.")
     st.markdown("---")
     st.subheader("📄 Özgeçmiş (CV)")
     try:
@@ -1044,6 +1310,12 @@ pg = st.navigation({
         st.Page(churn_sayfasi, title="Churn Tahmini", icon="🚪"),
         st.Page(fraud_sayfasi, title="Fraud Uyarı Sistemi", icon="🕵️"),
     ],
+    "📊 Kantitatif Finans (Canlı Optimizasyon)": [
+        st.Page(markowitz_sayfasi, title="Markowitz Portföy Optimizasyonu", icon="🥧"),
+    ],
+    "🕌 Katılım Bankacılığı": [
+        st.Page(katilim_fon_sayfasi, title="Murabaha & Sukuk Araçları", icon="🕌"),
+    ],
     "📐 Aktüeryal Yöntemler": [
         st.Page(ibnr_sayfasi, title="IBNR Muallak Hasar", icon="📐"),
         st.Page(hayat_sigortasi_sayfasi, title="Hayat Sigortası Fiyatlama", icon="👨‍🦳"),
@@ -1056,10 +1328,8 @@ pg = st.navigation({
     ],
     "🧪 Kavramsal Vitrin (Demo)": [
         st.Page(stres_testi_sayfasi, title="Aktüeryal Stres Testi", icon="⚡"),
-        st.Page(katilim_fon_sayfasi, title="Katılım Fon Takibi", icon="🪙"),
         st.Page(alm_nakit_sayfasi, title="ALM Nakit Eşitleme", icon="🔄"),
         st.Page(alm_durasyon_sayfasi, title="ALM Durasyon", icon="⚖️"),
-        st.Page(markowitz_sayfasi, title="Markowitz Optimizasyonu", icon="🥧"),
         st.Page(varlik_dagilimi_sayfasi, title="Varlık Dağılımı", icon="📊"),
         st.Page(benchmark_sayfasi, title="Piyasa Kıyaslama", icon="📈"),
         st.Page(telematik_sayfasi, title="Telematik Risk Skorlama", icon="🚗"),
