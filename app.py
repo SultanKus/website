@@ -920,9 +920,47 @@ tam olarak kendisidir — yani buradaki teknik panel ile kantitatif modüller ay
 
             kayit_ekle("Canlı Teknik Analiz", f"{secilen_hisse} / {secilen_periyot} incelendi", "Başarılı")
 
+@st.cache_data(ttl=3600, show_spinner=False)
+def _coklu_hisse_kapanis_getir(hisseler, periyot):
+    """Birden çok sembolün kapanış fiyatlarını TEK yfinance çağrısıyla indirir."""
+    hisseler = list(hisseler)
+    ham = yf.download(hisseler, period=periyot, progress=False, auto_adjust=True, threads=True)
+    if ham is None or ham.empty:
+        return pd.DataFrame()
+    if isinstance(ham.columns, pd.MultiIndex):
+        kapanis = ham["Close"].copy()
+    else:
+        kapanis = ham[["Close"]].copy()
+        kapanis.columns = hisseler[:1]
+    try:
+        if getattr(kapanis.index, "tz", None) is not None:
+            kapanis.index = kapanis.index.tz_localize(None)
+    except (TypeError, AttributeError):
+        pass
+    return kapanis.dropna(how="all")
+
+
 def veri_analizi_sayfasi():
-    st.header("Hisse Korelasyon Analizi")
-    st.caption("Yahoo Finance'ten çekilen gerçek fiyat verisiyle hesaplanır.")
+    st.markdown("""
+    <style>
+    .piyasa-karti { background:#ffffff; border-radius:10px; padding:14px 16px 6px 16px;
+                    box-shadow:0 2px 6px rgba(0,0,0,0.06); margin-bottom:-10px; }
+    .pk-ad     { font-size:0.80rem; text-transform:uppercase; letter-spacing:0.6px;
+                 color:#5a6b7b !important; font-weight:600; }
+    .pk-deger  { font-size:1.45rem; font-weight:700; color:#0b1f33 !important; line-height:1.4; }
+    .pk-rozet  { display:inline-block; padding:2px 8px; border-radius:6px;
+                 font-size:0.82rem; font-weight:700; }
+    .pk-alt    { font-size:0.85rem; color:#8a97a3 !important; }
+    </style>
+    """, unsafe_allow_html=True)
+
+    st.header("📈 Canlı Hisse Korelasyon & Performans Analizi")
+    st.markdown(
+        '<div class="model-badge">✅ Yahoo Finance üzerinden gerçek fiyat verisiyle hesaplanır — '
+        'tüm semboller tek istekte indirilir.</div>',
+        unsafe_allow_html=True
+    )
+
     egitim_notu("""
 Burada ölçtüğüm şey, iki hissenin fiyatının aynı gün aynı yönde mi hareket ettiği. Korelasyon
 katsayısı +1'e yakınsa ikisi neredeyse birlikte hareket ediyor demektir, 0'a yakınsa aralarında
@@ -949,70 +987,134 @@ ayrıca test edilir (bkz. Solvency II ve Stres Testi sayfaları).
     with c1:
         etiketler = [f"{ad} ({sembol})" for sembol, ad in BIST_POPULER]
         secilen_etiketler = st.multiselect(
-            "Karşılaştırılacak Hisseler", etiketler, default=etiketler[:5]
+            "Karşılaştırılacak Hisseler", etiketler, default=etiketler[:5], key="korr_secim"
         )
         hisse_listesi = [BIST_POPULER[etiketler.index(e)][0] for e in secilen_etiketler]
-        ekstra = st.text_input("İsteğe bağlı ek semboller (virgülle ayırın, örn. AAPL, TSLA)", value="")
+        ekstra = st.text_input("İsteğe bağlı ek semboller (virgülle ayırın, örn. AAPL, TSLA)",
+                               value="", key="korr_ekstra")
         if ekstra.strip():
             hisse_listesi += [h.strip() for h in ekstra.split(',') if h.strip()]
     with c2:
-        periyot = st.selectbox("Periyot", ["6mo", "1y", "2y", "5y"], index=1)
+        periyot = st.selectbox("Periyot", ["6mo", "1y", "2y", "5y"], index=1, key="korr_periyot")
 
     if len(hisse_listesi) < 2:
         st.info("En az 2 hisse seçin.")
         return
 
-    if st.button("Korelasyon Matrisini Hesapla"):
-        with st.spinner("Hisse verileri indiriliyor..."):
-            df_fiyat = pd.DataFrame()
-            basarisiz = []
-            for hisse in hisse_listesi:
-                veri = canli_piyasa_verisi_getir(hisse, periyot)
-                if not veri.empty:
-                    df_fiyat[hisse] = veri['Close']
-                else:
-                    basarisiz.append(hisse)
+    if not st.button("Analizi Getir", type="primary"):
+        return
 
-            if basarisiz:
-                st.warning(f"Şu semboller için veri bulunamadı, hesaplamadan çıkarıldı: {', '.join(basarisiz)}")
+    with st.spinner("Hisse verileri indiriliyor..."):
+        df_fiyat = _coklu_hisse_kapanis_getir(tuple(hisse_listesi), periyot)
 
-            if df_fiyat.shape[1] < 2:
-                st.error("Korelasyon hesaplamak için en az 2 hissenin verisi gerekiyor.")
-                return
+    if df_fiyat.empty:
+        st.error("Hiçbir sembol için veri bulunamadı.")
+        return
 
-            df_getiri = df_fiyat.pct_change().dropna()
-            corr_matrix = df_getiri.corr()
+    basarisiz = [h for h in hisse_listesi if h not in df_fiyat.columns or df_fiyat[h].dropna().empty]
+    if basarisiz:
+        st.warning(f"Şu semboller için veri bulunamadı, analizden çıkarıldı: {', '.join(basarisiz)}")
+    df_fiyat = df_fiyat.drop(columns=[h for h in basarisiz if h in df_fiyat.columns])
 
-            fig = px.imshow(corr_matrix, text_auto=".2f", aspect="auto", color_continuous_scale='RdBu_r',
-                             zmin=-1, zmax=1, title=f"Günlük Getiri Korelasyonu ({periyot})")
-            st.plotly_chart(fig, width="stretch")
+    if df_fiyat.shape[1] < 2:
+        st.error("Korelasyon hesaplamak için en az 2 hissenin verisi gerekiyor.")
+        return
 
-            corr_pairs = corr_matrix.where(np.triu(np.ones(corr_matrix.shape), k=1).astype(bool)).stack()
-            if not corr_pairs.empty:
-                en_yuksek = corr_pairs.idxmax()
-                en_dusuk = corr_pairs.idxmin()
-                ortalama = corr_pairs.mean()
+    ad_sozlugu = dict(BIST_POPULER)
 
-                st.markdown("#### Okuma")
-                m1, m2, m3 = st.columns(3)
-                m1.metric("En Güçlü Birliktelik", f"{en_yuksek[0]} – {en_yuksek[1]}", f"{corr_pairs[en_yuksek]:.2f}")
-                m2.metric("En Bağımsız Çift", f"{en_dusuk[0]} – {en_dusuk[1]}", f"{corr_pairs[en_dusuk]:.2f}")
-                m3.metric("Ortalama Korelasyon", f"{ortalama:.2f}")
+    # --- Kart paneli: her hisse için son fiyat + dönem getirisi + sparkline ---
+    st.subheader("🧾 Seçilen Hisseler")
+    hisseler = list(df_fiyat.columns)
+    for satir_baslangic in range(0, len(hisseler), 4):
+        sutunlar = st.columns(4)
+        for sutun, sembol in zip(sutunlar, hisseler[satir_baslangic:satir_baslangic + 4]):
+            seri = df_fiyat[sembol].dropna()
+            enstruman = {"ad": ad_sozlugu.get(sembol, sembol), "birim": "", "ondalik": 2}
+            gun_sayisi = max(len(seri) - 1, 1)
+            piyasa_karti(sutun, enstruman, seri, gun_sayisi)
 
-                if ortalama > 0.6:
-                    st.caption(
-                        f"Seçilen grup genel olarak yüksek korelasyonlu (ortalama {ortalama:.2f}) — "
-                        "hepsi büyük ölçüde aynı piyasa hareketine tepki veriyor, çeşitlendirme etkisi sınırlı kalır."
-                    )
-                elif ortalama < 0.2:
-                    st.caption(
-                        f"Seçilen grup düşük korelasyonlu (ortalama {ortalama:.2f}) — "
-                        "bir arada tutulduklarında portföy riski, tek tek hisselerin riskinin toplamından belirgin şekilde düşük çıkar."
-                    )
-                else:
-                    st.caption(f"Seçilen grubun ortalama korelasyonu {ortalama:.2f} — orta düzeyde bir çeşitlendirme etkisi var.")
+    st.markdown("---")
 
-            kayit_ekle("Hisse Korelasyonu", f"{df_fiyat.shape[1]} hisse, {periyot}", "Matris hesaplandı")
+    # --- Bazlanmış performans grafiği ---
+    st.subheader("📊 Bazlanmış Performans Karşılaştırması")
+    st.caption(f"Her hisse, seçilen {periyot} döneminin başında 100'e eşitlenmiştir — göreli performansı gösterir.")
+    normalize = pd.DataFrame(index=df_fiyat.index)
+    for sembol in hisseler:
+        seri = df_fiyat[sembol].dropna()
+        if not seri.empty and seri.iloc[0] != 0:
+            normalize[ad_sozlugu.get(sembol, sembol)] = seri / seri.iloc[0] * 100
+    if not normalize.empty:
+        fig_norm = px.line(normalize, title=f"Göreli Performans ({periyot}, başlangıç = 100)")
+        fig_norm.add_hline(y=100, line_dash="dash", line_color="#8a97a3")
+        fig_norm.update_layout(height=420, yaxis_title="Endeks (baz 100)", xaxis_title="",
+                               legend_title_text="", hovermode="x unified")
+        st.plotly_chart(fig_norm, width="stretch")
+
+    st.markdown("---")
+
+    # --- Korelasyon ısı haritası ---
+    st.subheader("🔥 Günlük Getiri Korelasyon Matrisi")
+    df_getiri = df_fiyat.pct_change().dropna()
+    corr_matrix = df_getiri.corr()
+    corr_goster = corr_matrix.rename(index=ad_sozlugu, columns=ad_sozlugu)
+
+    fig = px.imshow(corr_goster, text_auto=".2f", aspect="auto", color_continuous_scale='RdBu_r',
+                     zmin=-1, zmax=1, title=f"Günlük Getiri Korelasyonu ({periyot})")
+    fig.update_layout(height=max(380, 60 * len(hisseler)), coloraxis_colorbar=dict(title="Korelasyon"))
+    fig.update_traces(hovertemplate="%{y} – %{x}<br>Korelasyon: %{z:.2f}<extra></extra>")
+    st.plotly_chart(fig, width="stretch")
+
+    corr_pairs = corr_matrix.where(np.triu(np.ones(corr_matrix.shape), k=1).astype(bool)).stack()
+    if not corr_pairs.empty:
+        en_yuksek = corr_pairs.idxmax()
+        en_dusuk = corr_pairs.idxmin()
+        ortalama = corr_pairs.mean()
+
+        st.markdown("#### Okuma")
+        m1, m2, m3 = st.columns(3)
+        m1.metric("En Güçlü Birliktelik",
+                  f"{ad_sozlugu.get(en_yuksek[0], en_yuksek[0])} – {ad_sozlugu.get(en_yuksek[1], en_yuksek[1])}",
+                  f"{corr_pairs[en_yuksek]:.2f}")
+        m2.metric("En Bağımsız Çift",
+                  f"{ad_sozlugu.get(en_dusuk[0], en_dusuk[0])} – {ad_sozlugu.get(en_dusuk[1], en_dusuk[1])}",
+                  f"{corr_pairs[en_dusuk]:.2f}")
+        m3.metric("Ortalama Korelasyon", f"{ortalama:.2f}")
+
+        if ortalama > 0.6:
+            st.caption(
+                f"Seçilen grup genel olarak yüksek korelasyonlu (ortalama {ortalama:.2f}) — "
+                "hepsi büyük ölçüde aynı piyasa hareketine tepki veriyor, çeşitlendirme etkisi sınırlı kalır."
+            )
+        elif ortalama < 0.2:
+            st.caption(
+                f"Seçilen grup düşük korelasyonlu (ortalama {ortalama:.2f}) — "
+                "bir arada tutulduklarında portföy riski, tek tek hisselerin riskinin toplamından belirgin şekilde düşük çıkar."
+            )
+        else:
+            st.caption(f"Seçilen grubun ortalama korelasyonu {ortalama:.2f} — orta düzeyde bir çeşitlendirme etkisi var.")
+
+    st.markdown("---")
+
+    # --- Volatilite karşılaştırması ---
+    st.subheader("⚡ Yıllıklandırılmış Volatilite Karşılaştırması")
+    egitim_notu("""
+Volatilite, günlük getirilerin standart sapmasının `√252` ile ölçeklenmesidir — bir hissenin
+fiyatının ne kadar "oynak" olduğunun standart ölçüsü. Yüksek volatilite tek başına "kötü" demek
+değildir; daha çok risk ve daha çok potansiyel getiri birlikte gelir. Bu grafikteki sıralama,
+Markowitz sayfasındaki optimizasyonun neden bazı hisselere düşük ağırlık verdiğini sezgisel
+olarak açıklar — aynı beklenen getiri için daha oynak bir hisse, portföy varyansına orantısız
+katkı yapar.
+""", baslik="📚 Volatilite neyi ölçer?")
+    volatilite = (df_getiri.std() * np.sqrt(252) * 100).sort_values(ascending=False)
+    volatilite.index = [ad_sozlugu.get(s, s) for s in volatilite.index]
+    fig_vol = px.bar(volatilite, orientation="h", title="Yıllık Volatilite (%)",
+                     color=volatilite.values, color_continuous_scale="Blues")
+    fig_vol.update_layout(height=max(300, 40 * len(hisseler)), showlegend=False,
+                          xaxis_title="Yıllık Volatilite (%)", yaxis_title="",
+                          coloraxis_showscale=False)
+    st.plotly_chart(fig_vol, width="stretch")
+
+    kayit_ekle("Hisse Korelasyonu", f"{df_fiyat.shape[1]} hisse, {periyot}", "Matris hesaplandı")
 
 # ---------------------------------------------------------
 # ✅ DOĞRULANMIŞ ML MODELLERİ
