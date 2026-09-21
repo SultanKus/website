@@ -333,57 +333,108 @@ def hisse_secici(key_prefix, varsayilan="THYAO.IS"):
 # GENEL BAKIŞ & CANLI PİYASA SAYFALARI
 # ---------------------------------------------------------
 def ml_rehberi_sayfasi():
-    st.header("🎓 Makine Öğrenmesi & Aktüeryal Yöntemler Rehberi")
-    st.markdown("Bu sayfa, sitedeki modüllerde kullanılan yöntemlerin teorik arka planını özetler. "
-                 "Her modülün kendi sayfasında da 📚 açılır bölümde o modüle özgü detay bulunur.")
-
-    st.subheader("1️⃣ Regresyon mu, Sınıflandırma mı?")
+    st.header("Yöntem Notları")
     st.markdown("""
-| Soru tipi | Çıktı | Bu sitedeki örnek |
-|---|---|---|
-| "Ne kadar?" (regresyon) | Sayısal değer | Kasko saf prim (Poisson GLM) |
-| "Hangisi?" (sınıflandırma) | Kategori / olasılık | Kredi risk, churn, fraud (Lojistik Regresyon) |
+Bu sayfa bir ders anlatımı değil; sitedeki modülleri kurarken hangi yöntemi neden seçtiğimin
+notları. Mülakatta "burada neden lojistik regresyon kullandın?" diye sorulduğunda vereceğim
+cevaplar da burada.
 """)
 
-    st.subheader("2️⃣ GLM (Genelleştirilmiş Doğrusal Model) Ailesi")
+    st.subheader("Önce soru, sonra model")
     st.markdown("""
-Sıradan doğrusal regresyon (OLS), verinin normal dağıldığını varsayar. Gerçek sigorta/finans verisi nadiren
-bu şekildedir — bu yüzden GLM ailesi kullanılır; her biri farklı bir "link fonksiyonu" ile çıktıyı doğru
-aralığa (pozitif, 0-1 vb.) sıkıştırır.
-""")
-    st.latex(r"g(E[Y|X]) = X\beta \quad \text{(g: link fonksiyonu)}")
-    st.markdown("""
-- **Poisson GLM** (log-link): sayım verisi için (hasar adedi) — bu sitede Kasko modülünde kullanılıyor.
-- **Gamma GLM** (log-link): pozitif, sürekli ve çarpık veri için (hasar tutarı/şiddeti) — bu sitede varsayımsal olarak ele alınıyor, üretimde ayrı eğitilmesi gerekir.
-- **Logistic (Binomial) GLM** (logit-link): ikili sınıflandırma için (temerrüt, churn, fraud) — bu sitede Kredi Risk/Churn/Fraud modüllerinde kullanılıyor.
+Modeli veri değil, sorunun kendisi belirliyor. "Bu sürücü yılda kaç hasar yapar?" dediğimde
+cevap bir sayı; "bu müşteri krediyi öder mi?" dediğimde cevap iki kategoriden biri. Birincisi
+regresyon, ikincisi sınıflandırma. Sitede Kasko modülü birinci gruba, Kredi Risk / Churn /
+Fraud modülleri ikinci gruba giriyor.
+
+Ayrım basit görünüyor ama pratikte karıştırılıyor: "temerrüt olasılığı" sürekli bir sayı
+üretir, yine de problem sınıflandırmadır — çünkü gerçek hayatta gözlemlediğin etiket 0 veya 1.
 """)
 
-    st.subheader("3️⃣ Neden Eğitim/Test Ayrımı (Train/Test Split)?")
+    st.subheader("Neden düz regresyon değil de GLM?")
     st.markdown("""
-Bir model, gördüğü veriyi ezberleyebilir (**overfitting**) — eğitim verisinde mükemmel ama hiç görmediği yeni
-veride kötü performans gösterir. Bunu tespit etmek için veri ikiye bölünür: model sadece eğitim (train)
-kümesiyle öğrenir, performansı ise hiç görmediği test kümesinde ölçülür. Bu sitedeki her "✅ Doğrulanmış ML
-Modeli" sayfasında bu ayrım yapılır ve metrik test kümesinden raporlanır.
+Klasik doğrusal regresyon (OLS) iki şey varsayar: hata terimi normal dağılır ve tahmin
+istediği değeri alabilir. Sigorta verisinde ikisi de tutmuyor.
+
+Kasko modülündeki `ClaimNb` sütununu düşünün: poliçelerin büyük çoğunluğu 0 hasar, bir kısmı 1,
+çok azı 2 ve üzeri. Dağılım sıfıra yığılmış ve sağa çarpık. Bu veriye OLS uydurursanız model
+bazı segmentler için **negatif hasar sayısı** tahmin eder. "Bu sürücü yılda -0.04 hasar yapar"
+cümlesinin bir karşılığı yok.
+
+GLM'in çözümü, tahmini doğru aralığa sıkıştıran bir link fonksiyonu kullanmak:
+""")
+    st.latex(r"g\big(E[Y \mid X]\big) = X\beta")
+    st.markdown("""
+Poisson GLM'de `g` logaritma olduğu için tahmin `exp(Xβ)` şeklinde çıkar ve hiçbir zaman
+negatif olamaz. Lojistik regresyonda link logit'tir, çıktı 0-1 arasına hapsolur. Gamma GLM ise
+pozitif ve çarpık büyüklükler için kullanılır — hasar tutarı gibi.
+
+Aktüeryada standart kurulum, hasar sayısı için Poisson, hasar tutarı için Gamma modeli kurup
+ikisini çarpmaktır. Kasko modülünde frekans kısmı gerçek veriyle eğitilmiş durumda; tutar
+tarafı için elimdeki veri setinde sütun olmadığından o kısım varsayım olarak giriliyor ve bunu
+sayfada açıkça yazdım.
 """)
 
-    st.subheader("4️⃣ Metrik Sözlüğü")
+    st.subheader("Eğitim ve test verisini neden ayırıyorum")
     st.markdown("""
-| Metrik | Ne ölçer | Ne zaman kullanılır |
-|---|---|---|
-| **AUC** | Modelin pozitif/negatif sınıfı rastgele bir çiftte doğru sıralama olasılığı (0.5=rastgele, 1.0=mükemmel) | İkili sınıflandırma |
-| **F1** | Precision ve Recall'un harmonik ortalaması | Dengesiz (imbalanced) sınıflandırma verisi |
-| **Poisson Deviance** | Tahmin ile gerçek sayım verisi arasındaki sapma (düşük iyi) | Sayım verisi regresyonu (frekans modelleri) |
-| **VaR (Value at Risk)** | Belirli bir güven düzeyinde aşılmayacak maksimum kayıp | Risk sermayesi / reasürans kararları |
+Bir model, gördüğü veriyi ezberleyip henüz görmediği veride çökebilir. Bunu anlamanın tek yolu,
+modele hiç göstermediğiniz bir parça veriyi kenara ayırıp performansı orada ölçmek.
+
+Sitedeki her eğitilmiş modelde veri %75 eğitim / %25 test olarak bölünüyor ve rozette gördüğünüz
+metrik **test** kümesinden geliyor, eğitim kümesinden değil. Sınıflandırma modellerinde ayrıca
+`stratify` kullanıyorum; aksi halde azınlık sınıfı test kümesine dengesiz dağılabiliyor ve skor
+gürültülü çıkıyor.
 """)
 
-    st.subheader("5️⃣ Sentetik Veri Neden Bazı Modüllerde Kullanılıyor?")
+    st.subheader("Doğruluk (accuracy) neden yanıltıcı")
     st.markdown("""
-Gerçek fraud/churn/kredi verisi genelde şirket içi ve gizlidir; halka açık olanların çoğu ya çok büyük ya da
-alan (domain) uyuşmuyor. Bu sitedeki Churn ve Fraud modülleri, **bilinen risk faktörlerinin mantıksal bir
-ilişkisiyle** (rastgele değil) üretilmiş sentetik veriyle eğitilmiştir — amaç, doğru ML metodolojisini dürüstçe
-göstermektir. Kredi Risk modülü ise mümkün olduğunda gerçek bir açık veri setine (OpenML German Credit)
-bağlanır; erişilemezse aynı şeffaflıkla sentetik veriye döner. Her modülün kendi sayfasında hangi veriyle
-çalıştığı rozetle (✅ gerçek / 🧪 demo) açıkça belirtilir.
+Fraud verisinde vakaların diyelim %2'si gerçek suistimal. Hiçbir şey öğrenmeyen, her başvuruya
+"temiz" diyen bir model %98 doğruluk alır. Rakam muhteşem görünür, model tamamen işe yaramazdır.
+
+Bu yüzden dengesiz veride iki metriğe bakıyorum:
+
+**AUC**, modelin rastgele seçilmiş bir riskli ve bir risksiz kaydı doğru sıralama olasılığıdır.
+0.50 yazı tura demek, 1.00 kusursuz ayrım. Eşik değerinden (0.5 vb.) bağımsız çalıştığı için
+modelin sıralama gücünü ölçer.
+
+**F1**, kaçırdığınız gerçek vakalar (recall) ile boşuna alarm verdiğiniz temiz vakalar
+(precision) arasındaki dengeyi tek sayıya indirir. İş tarafında bu dengeyi seçmek teknik değil
+ticari bir karardır: bir fraud incelemesinin maliyeti, kaçan bir dolandırıcılığın maliyetinden
+ucuzsa recall'u yükseltmek mantıklıdır.
+
+Sayım verisinde (Kasko) bunların ikisi de anlamsız; orada **Poisson deviance** raporluyorum,
+düşük olması iyi.
+""")
+
+    st.subheader("Bazı modüllerde sentetik veri var, sebebi şu")
+    st.markdown("""
+Fraud, churn ve müşteri davranışı verisi şirket içi ve gizli. Halka açık olanlar ya çok eski,
+ya başka bir ülkenin pazarına ait, ya da hedef değişkeni bu modüllerin anlattığı şeyle
+örtüşmüyor. İki seçeneğim vardı: modülü hiç yapmamak, ya da veriyi kendim üretip bunu açıkça
+söylemek. İkincisini seçtim.
+
+Ürettiğim veri rastgele etiket atamıyor. Hedef değişken, bilinen risk faktörlerinin lojistik
+bir fonksiyonu olarak kuruluyor — örneğin churn'de müşterilik süresi uzadıkça terk olasılığı
+düşüyor, şikayet sayısı arttıkça yükseliyor. Yani model gerçek bir sinyali öğreniyor, ama o
+sinyali ben koydum. Bu şu demek: metrikler metodolojinin doğru kurulduğunu gösterir, modelin
+gerçek dünyada bu performansı vereceğini **göstermez**.
+
+Kredi Risk modülü bunun istisnası: önce gerçek bir açık veri setine (OpenML German Credit)
+bağlanmayı deniyor, erişim olmazsa aynı şeffaflıkla sentetiğe düşüyor ve rozet hangisinin
+kullanıldığını yazıyor.
+""")
+
+    st.subheader("Hangi sayfa ne kadar 'gerçek'")
+    st.markdown("""
+Sitede üç tür içerik var ve her sayfanın üstündeki rozet hangisi olduğunu söylüyor:
+
+Gerçek veriyle eğitilmiş ve test kümesinde doğrulanmış modeller (Kasko GLM, Kredi Risk),
+sektörde birebir kullanılan deterministik aktüeryal formüller (IBNR, Black-Scholes,
+Solvency II — bunlar model değil, hesap), ve metodoloji göstermek için kurulmuş kavramsal
+modüller (Telematik, CLV, stres testi).
+
+Bu ayrımı yapmasam sayfa sayısı daha etkileyici görünürdü. Ama bir kredi risk modelini bir CLV
+formülüyle aynı vitrine koymak, ikisini de değersizleştiriyor.
 """)
 
 def ana_sayfa():
@@ -464,32 +515,98 @@ def finansal_bilgi_sayfasi():
                 st.error("Sembol bulunamadı (BIST hisselerinin sonuna .IS eklemeyi unutmayın, örn: KCHOL.IS).")
 
 def veri_analizi_sayfasi():
-    st.header("📈 Canlı Hisse Korelasyon Lab (EDA)")
-    st.caption("✅ Gerçek zamanlı Yahoo Finance verisiyle hesaplanır.")
-    etiketler = [f"{ad} ({sembol})" for sembol, ad in BIST_POPULER]
-    secilen_etiketler = st.multiselect(
-        "Korelasyon Hesaplanacak Hisseler (listeden seçin)",
-        etiketler, default=etiketler[:5]
-    )
-    hisse_listesi = [BIST_POPULER[etiketler.index(e)][0] for e in secilen_etiketler]
+    st.header("Hisse Korelasyon Analizi")
+    st.caption("Yahoo Finance'ten çekilen gerçek fiyat verisiyle hesaplanır.")
+    egitim_notu("""
+Burada ölçtüğüm şey, iki hissenin fiyatının aynı gün aynı yönde mi hareket ettiği. Korelasyon
+katsayısı +1'e yakınsa ikisi neredeyse birlikte hareket ediyor demektir, 0'a yakınsa aralarında
+doğrusal bir ilişki yok, -1'e yakınsa biri çıkarken diğeri düşüyor demektir.
 
-    ekstra = st.text_input("İsteğe bağlı ek semboller (virgülle ayırın, örn. AAPL, TSLA)", value="")
-    if ekstra.strip():
-        hisse_listesi += [h.strip() for h in ekstra.split(',') if h.strip()]
+Neden önemli? Bir portföyün riskini asıl belirleyen şey, içindeki hisselerin tek tek riski
+değil, birbirleriyle ne kadar birlikte hareket ettikleri. Beşi de bankacılık hissesi olan bir
+portföy, faiz kararı geldiğinde hepsi aynı anda düşer — çeşitlendirme sadece kağıt üzerinde
+kalır. Markowitz sayfasındaki optimizasyonun girdilerinden biri tam olarak bu matris; etkin
+sınırın şeklini kovaryans (dolayısıyla korelasyon) belirliyor.
 
-    if hisse_listesi and st.button("Gerçek Zamanlı Korelasyon Matrisini Çiz"):
-        with st.spinner('Hisse verileri indiriliyor...'):
-            df_korelasyon = pd.DataFrame()
+Hesapladığım şey fiyatın kendisi değil, günlük getiri (`pct_change`) korelasyonu. Fiyat
+serilerini doğrudan karşılaştırsaydım, ikisi de sadece genel piyasa trendiyle birlikte
+yükseldiği için sahte bir yüksek korelasyon çıkardı. Getiriye geçmek bu ortak trendi büyük
+ölçüde temizler.
+
+Sınırlaması: bu doğrusal (Pearson) korelasyon. Piyasa çöküşü gibi kriz anlarında hisseler
+arasındaki bağımlılık genelde sakin dönemlerden daha güçlüdür — buna korelasyon kırılması
+denir ve bu basit matris bunu yakalamaz. Kurumsal risk yönetiminde bu yüzden stres senaryoları
+ayrıca test edilir (bkz. Solvency II ve Stres Testi sayfaları).
+""")
+
+    c1, c2 = st.columns([3, 1])
+    with c1:
+        etiketler = [f"{ad} ({sembol})" for sembol, ad in BIST_POPULER]
+        secilen_etiketler = st.multiselect(
+            "Karşılaştırılacak Hisseler", etiketler, default=etiketler[:5]
+        )
+        hisse_listesi = [BIST_POPULER[etiketler.index(e)][0] for e in secilen_etiketler]
+        ekstra = st.text_input("İsteğe bağlı ek semboller (virgülle ayırın, örn. AAPL, TSLA)", value="")
+        if ekstra.strip():
+            hisse_listesi += [h.strip() for h in ekstra.split(',') if h.strip()]
+    with c2:
+        periyot = st.selectbox("Periyot", ["6mo", "1y", "2y", "5y"], index=1)
+
+    if len(hisse_listesi) < 2:
+        st.info("En az 2 hisse seçin.")
+        return
+
+    if st.button("Korelasyon Matrisini Hesapla"):
+        with st.spinner("Hisse verileri indiriliyor..."):
+            df_fiyat = pd.DataFrame()
+            basarisiz = []
             for hisse in hisse_listesi:
-                veri = canli_piyasa_verisi_getir(hisse, "1y")
+                veri = canli_piyasa_verisi_getir(hisse, periyot)
                 if not veri.empty:
-                    df_korelasyon[hisse] = veri['Close']
-            if not df_korelasyon.empty:
-                corr_matrix = df_korelasyon.pct_change().corr()
-                fig = px.imshow(corr_matrix, text_auto=".2f", aspect="auto", color_continuous_scale='RdBu_r',
-                                 title="1 Yıllık Getiri Korelasyon Isı Haritası")
-                st.plotly_chart(fig, width="stretch")
-                kayit_ekle("Canlı Korelasyon", f"{len(hisse_listesi)} Hisse Analiz Edildi", "Isı Haritası Çizildi")
+                    df_fiyat[hisse] = veri['Close']
+                else:
+                    basarisiz.append(hisse)
+
+            if basarisiz:
+                st.warning(f"Şu semboller için veri bulunamadı, hesaplamadan çıkarıldı: {', '.join(basarisiz)}")
+
+            if df_fiyat.shape[1] < 2:
+                st.error("Korelasyon hesaplamak için en az 2 hissenin verisi gerekiyor.")
+                return
+
+            df_getiri = df_fiyat.pct_change().dropna()
+            corr_matrix = df_getiri.corr()
+
+            fig = px.imshow(corr_matrix, text_auto=".2f", aspect="auto", color_continuous_scale='RdBu_r',
+                             zmin=-1, zmax=1, title=f"Günlük Getiri Korelasyonu ({periyot})")
+            st.plotly_chart(fig, width="stretch")
+
+            corr_pairs = corr_matrix.where(np.triu(np.ones(corr_matrix.shape), k=1).astype(bool)).stack()
+            if not corr_pairs.empty:
+                en_yuksek = corr_pairs.idxmax()
+                en_dusuk = corr_pairs.idxmin()
+                ortalama = corr_pairs.mean()
+
+                st.markdown("#### Okuma")
+                m1, m2, m3 = st.columns(3)
+                m1.metric("En Güçlü Birliktelik", f"{en_yuksek[0]} – {en_yuksek[1]}", f"{corr_pairs[en_yuksek]:.2f}")
+                m2.metric("En Bağımsız Çift", f"{en_dusuk[0]} – {en_dusuk[1]}", f"{corr_pairs[en_dusuk]:.2f}")
+                m3.metric("Ortalama Korelasyon", f"{ortalama:.2f}")
+
+                if ortalama > 0.6:
+                    st.caption(
+                        f"Seçilen grup genel olarak yüksek korelasyonlu (ortalama {ortalama:.2f}) — "
+                        "hepsi büyük ölçüde aynı piyasa hareketine tepki veriyor, çeşitlendirme etkisi sınırlı kalır."
+                    )
+                elif ortalama < 0.2:
+                    st.caption(
+                        f"Seçilen grup düşük korelasyonlu (ortalama {ortalama:.2f}) — "
+                        "bir arada tutulduklarında portföy riski, tek tek hisselerin riskinin toplamından belirgin şekilde düşük çıkar."
+                    )
+                else:
+                    st.caption(f"Seçilen grubun ortalama korelasyonu {ortalama:.2f} — orta düzeyde bir çeşitlendirme etkisi var.")
+
+            kayit_ekle("Hisse Korelasyonu", f"{df_fiyat.shape[1]} hisse, {periyot}", "Matris hesaplandı")
 
 # ---------------------------------------------------------
 # ✅ DOĞRULANMIŞ ML MODELLERİ
@@ -497,25 +614,34 @@ def veri_analizi_sayfasi():
 def kasko_fiyatlama_sayfasi():
     st.header("Aktüeryal Kasko Saf Prim Fiyatlama Motoru")
     egitim_notu("""
-**Bu bir regresyon problemidir** — çıktımız (hasar frekansı) sayısal bir değer, kategori değil.
+Burada tahmin ettiğim şey bir sayı: bir sürücünün yıl içinde kaç hasar yapacağı. Dolayısıyla
+problem regresyon. Ama düz doğrusal regresyon bu veriye uymuyor.
 
-**Neden sıradan doğrusal regresyon (OLS) değil de Poisson GLM?**
-Hasar sayısı (`ClaimNb`) hiç negatif olamaz, tam sayıdır ve genelde 0'a yığılmış, sağa çarpık bir dağılıma sahiptir.
-OLS regresyonu ise verinin normal dağıldığını ve tahminlerin negatif de olabileceğini varsayar — bu yüzden
-sigorta/aktüerya sektöründe sayım verisi (count data) için **Genelleştirilmiş Doğrusal Modeller (GLM)** ailesinden
-**Poisson regresyonu** kullanılır. Model şunu öğrenir:
+Sebebi veri setine bakınca görünüyor. `ClaimNb` sütununda poliçelerin ezici çoğunluğu 0, bir
+kısmı 1, çok azı 2 ve üzeri. Dağılım sıfıra yığılmış, sağa çarpık ve tam sayılardan oluşuyor.
+OLS regresyonu ise hatanın normal dağıldığını ve tahminin her değeri alabileceğini varsayar —
+o modeli bu veriye uydurduğumda bazı segmentler için negatif hasar sayısı tahmin ediyor.
+"Bu sürücü yılda -0.03 hasar yapar" cümlesinin karşılığı yok.
+
+Poisson regresyonu tam da bu tip sayım verisi için var. Öğrendiği ilişki şu:
 
 `E[Hasar Sayısı] = Exposure × exp(β₀ + β₁·Yaş + β₂·AraçYaşı + β₃·MotorGücü)`
 
-Burada `exp(...)` fonksiyonu (log-link), tahminin her zaman pozitif çıkmasını garanti eder.
+Dışarıdaki `exp` (log-link) tahminin hiçbir koşulda negatife düşmemesini garantiliyor.
 
-**Frekans-Şiddet ayrımı:** Gerçek aktüeryal fiyatlama, iki ayrı model kurar: hasar **sayısını** tahmin eden bir
-Poisson GLM (bu sayfa) ve hasar **tutarını** tahmin eden bir Gamma GLM. Saf prim, ikisinin çarpımıdır. Bu veri
-setinde tutar bilgisi olmadığı için şiddet kısmı varsayımsal bir slider ile giriliyor — gerçek üretimde ayrı bir
-Gamma GLM ile öğrenilmesi gerekir.
+Exposure kısmı önemli: poliçeler farklı sürelerde risk altında. Üç ay sigortalı biriyle on iki
+ay sigortalı birinin ham hasar sayısını karşılaştırmak yanıltıcı olur. Bu yüzden Exposure'ı
+`sample_weight` olarak veriyorum; model artık hasar adedini değil, birim zaman başına hasar
+oranını öğreniyor.
 
-**Değerlendirme metriği — Poisson Deviance:** Modelin gerçek ve tahmin edilen dağılımlar arasındaki farkı ne
-kadar iyi açıkladığını ölçer (R² karesinin sayım verisi için karşılığı gibi düşünülebilir); düşük olması iyidir.
+Eksik kalan taraf şu: gerçek aktüeryal fiyatlama iki modelden oluşur — hasar *sayısını* tahmin
+eden Poisson GLM (bu sayfa) ve hasar *tutarını* tahmin eden Gamma GLM. Saf prim ikisinin
+çarpımıdır. Kullandığım veri setinde tutar sütunu olmadığı için şiddet tarafını slider ile
+varsayım olarak giriyorum. Üretimde bunun freMTPL2sev gibi bir veriyle ayrıca eğitilmesi gerekir;
+sayfada uydurulmuş bir tutar modeli varmış gibi göstermek istemedim.
+
+Metrik olarak AUC göremezsiniz, çünkü ortada sınıflandırma yok. Sayım verisinde karşılığı
+Poisson deviance: modelin tahmin ettiği dağılımla gerçek dağılım arasındaki sapma. Düşük olması iyi.
 """)
     t1, t2, t3 = st.tabs(["📊 Uygulama Paneli", "📐 Matematiksel Model", "💼 İş Değeri"])
     with t1:
@@ -565,21 +691,27 @@ kadar iyi açıkladığını ölçer (R² karesinin sayım verisi için karşıl
 def kredi_risk_sayfasi():
     st.header("Kredi Risk Skorlama (Lojistik Regresyon)")
     egitim_notu("""
-**Bu bir sınıflandırma (classification) problemidir** — çıktı "temerrüt (1) / temerrüt değil (0)" gibi iki
-kategoriden biri, sayısal bir miktar değil.
+Bu sayfada cevap aradığım soru "ne kadar" değil, "hangisi": başvuru sahibi krediyi öder mi,
+ödemez mi. İki kategori, dolayısıyla sınıflandırma.
 
-**Neden Lojistik Regresyon?** Çıktının 0 ile 1 arasında bir **olasılık** olarak yorumlanabilmesi lazım
-(doğrusal regresyon 1.3 ya da -0.4 gibi anlamsız değerler üretebilir). Lojistik regresyon, sigmoid fonksiyonu
-ile skoru olasılığa sıkıştırır: `P(Temerrüt) = 1 / (1 + e^-(β·X))`. Bankacılık/kredi sektöründe hâlâ en çok
-tercih edilen yöntemlerden biridir çünkü **yorumlanabilir**: her katsayı, o değişkenin riski ne yönde
-etkilediğini gösterir — bu, regülasyon ve müşteriye "neden reddedildiniz" açıklaması için önemlidir.
+Model çıktısı yine de bir sayı — temerrüt olasılığı. Lojistik regresyonun yaptığı iş tam olarak
+bu: skoru sigmoid fonksiyonuyla 0-1 aralığına sıkıştırmak. Düz doğrusal regresyon kullansaydım
+model 1.4 veya -0.2 gibi olasılık olarak okunamayan değerler üretirdi.
 
-**`class_weight='balanced'` neden var?** Gerçek kredi verilerinde "kötü" müşteri sayısı azınlıktadır
-(dengesiz/imbalanced veri). Bu ayar olmadan model, çoğunluk sınıfını ezberleyip azınlığı gözden kaçırabilir.
+Daha güçlü algoritmalar dururken neden lojistik regresyon? Çünkü bankacılıkta model yorumlanabilir
+olmak zorunda. Her katsayı, o değişkenin riski hangi yönde ve ne kadar ittiğini söylüyor. Bu
+sadece akademik bir zarafet değil; regülasyon müşteriye başvurusunun neden reddedildiğinin
+açıklanmasını istiyor ve "gradient boosting öyle dedi" kabul edilebilir bir cevap değil.
 
-**Metrikler:**
-- **AUC (0.5–1.0):** Modelin iyi müşteriyle kötü müşteriyi rastgele bir çiftte doğru sıralama olasılığı. 0.5 = yazı tura, 1.0 = mükemmel ayrım.
-- **F1:** Precision (yanlış alarm oranı düşük mü) ile Recall (kötü müşteriyi kaçırmıyor mu) arasındaki dengeyi tek sayıya indirir; dengesiz veri setlerinde ham doğruluk (accuracy) yanıltıcı olduğu için tercih edilir.
+`class_weight='balanced'` ayarı burada kritik. Gerçek kredi portföyünde temerrüde düşen müşteri
+azınlıkta. Bu ayar olmadan model çoğunluğu ezberleyip herkese "iyi müşteri" demeyi öğrenebilir —
+yüksek doğruluk, sıfır fayda. Ağırlıklandırma, azınlık sınıfındaki hataları modele daha pahalıya
+mal ediyor.
+
+Raporladığım iki metrik: AUC, modelin rastgele seçilmiş bir iyi ve bir kötü müşteriyi doğru
+sıralama olasılığı (0.50 yazı tura, 1.00 kusursuz). F1 ise kaçırılan kötü müşterilerle boşuna
+reddedilen iyi müşteriler arasındaki dengeyi ölçüyor. Dengesiz veride ham doğruluğa bakmak
+anlamsız olduğu için ikisini birlikte veriyorum, ikisi de test kümesinden.
 """)
     sonuc = kredi_risk_modelini_egit()
     model_rozeti(sonuc['auc'], sonuc['f1'], sonuc['kaynak'])
@@ -616,13 +748,21 @@ etkilediğini gösterir — bu, regülasyon ve müşteriye "neden reddedildiniz"
 def churn_sayfasi():
     st.header("Müşteri Kaybı (Churn) Erken Uyarı Sistemi")
     egitim_notu("""
-**Yine bir sınıflandırma problemi** ("terk edecek / etmeyecek"), Kredi Risk sayfasındaki gibi Lojistik Regresyon
-kullanılıyor. Farkı, girdi değişkenleri: kredi skoru yerine burada müşterilik süresi, şikayet sayısı ve ürün
-sayısı gibi **davranışsal (behavioral)** sinyaller kullanılıyor — churn modellemesinde genelde demografik
-verilerden çok "son 30-90 gün içindeki davranış değişimi" en güçlü sinyali verir.
+Yöntem olarak Kredi Risk sayfasındakiyle aynı yerdeyiz — lojistik regresyon, iki sınıf. Değişen
+şey girdiler.
 
-**Neden AUC/F1 hâlâ önemli?** Churn de tipik olarak dengesizdir (çoğu müşteri kalır, azınlık terk eder), bu
-yüzden accuracy yerine yine AUC/F1 raporlanıyor.
+Kredi modelinde ağırlıklı olarak finansal durum verisi vardı. Churn'de işe yarayan sinyaller
+davranışsal: müşterilik süresi, şikayet sayısı, sahip olunan ürün adedi. Sektörde genel kabul,
+demografik bilginin churn tahmininde zayıf kaldığı yönünde — kimin gideceğini yaşı değil, son
+haftalardaki davranış değişimi haber veriyor. Kullanım sıklığındaki düşüş, arka arkaya açılan
+destek kaydı, tek ürüne inme gibi.
+
+Ürün sayısının etkisi burada özellikle görünür durumda. Birden fazla ürünü olan müşterinin
+ayrılması daha maliyetli ve daha zahmetli; bu yüzden ürün sayısı arttıkça terk olasılığı
+düşüyor. Bankacılıkta "çapraz satış müşteriyi bağlar" sezgisinin sayısal karşılığı bu.
+
+Churn de dengesiz bir problem — çoğu müşteri kalır. O yüzden accuracy yerine yine AUC ve F1
+raporluyorum.
 """)
     model, auc, f1 = churn_modelini_egit()
     model_rozeti(auc, f1, "Sentetik veri (metodoloji gösterimi — bkz. not aşağıda)")
@@ -644,11 +784,21 @@ yüzden accuracy yerine yine AUC/F1 raporlanıyor.
 def fraud_sayfasi():
     st.header("ML Hasar Suistimali (Fraud) Uyarı Sistemi")
     egitim_notu("""
-**Yine sınıflandırma**, ama fraud modellerinde tipik zorluk çok daha uçtur: gerçek hayatta fraud vakaları
-genelde toplam hasarların %1-2'sini bile bulmaz (aşırı dengesiz veri). Bu yüzden üretimde tek başına Lojistik
-Regresyon yerine genelde **SMOTE gibi örnekleme teknikleri**, **isolation forest** (anomali tespiti) veya
-**gradient boosting** (XGBoost/LightGBM) tercih edilir. Bu sayfa metodolojiyi (train/test + AUC/F1) doğru
-gösterir ama üretim kalitesinde bir fraud sistemi için tek başına yeterli değildir.
+Yine sınıflandırma, ama fraud'da dengesizlik başka bir boyutta. Gerçek portföylerde suistimalli
+hasar oranı çoğu zaman %1-2'yi bulmaz. Bu şu tuhaf sonucu doğurur: hiçbir şey öğrenmeyen, her
+dosyaya "temiz" diyen bir model %98 doğruluk alır. Metrik seçimi burada modelin kendisinden
+daha kritik hale geliyor.
+
+Sayfadaki model lojistik regresyon ve metodolojiyi doğru kuruyor: train/test ayrımı var, metrik
+test kümesinden geliyor, azınlık sınıfı ağırlıklandırılmış. Ama üretim kalitesinde bir fraud
+sistemi için tek başına yeterli olmadığını söylemem lazım. Sahada tipik olarak SMOTE benzeri
+örnekleme teknikleri, anomali tespiti için isolation forest veya doğrusal olmayan etkileşimleri
+yakalayan gradient boosting (XGBoost, LightGBM) tercih ediliyor.
+
+Bir de modelin kendisinden bağımsız bir sorun var: fraud verisinde etiket güvenilmezdir.
+"Fraud değil" diye işaretlenen dosyaların bir kısmı aslında yakalanamamış fraud'dur. Yani model
+gerçek suistimali değil, şirketin geçmişte *tespit edebildiği* suistimali öğrenir. Bu yüzden
+fraud modelleri genelde tek başına karar vermez; insan incelemesine düşecek dosyaları önceliklendirir.
 """)
     model, auc, f1 = fraud_modelini_egit()
     model_rozeti(auc, f1, "Sentetik veri (metodoloji gösterimi — bkz. not aşağıda)")
