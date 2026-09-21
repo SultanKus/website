@@ -1,29 +1,285 @@
-# =========================================================
-# MAKROEKONOMİ & PİYASALAR — YENİLENMİŞ BÖLÜM
-#
-# KULLANIM:
-# 1) app.py'nin en üstündeki import bloğuna şunu ekleyin:
-#        from plotly.subplots import make_subplots
-# 2) Mevcut "CANLI PİYASA VERİSİ (yfinance)" bölümündeki
-#    canli_piyasa_verisi_getir / hisse_ara / BIST_POPULER / hisse_secici
-#    fonksiyonlarını ve finansal_bilgi_sayfasi() fonksiyonunu
-#    aşağıdaki kodla DEĞİŞTİRİN. (Navigasyonda değişiklik gerekmiyor,
-#    fonksiyon adı aynı kaldı.)
-# 3) EVDS API anahtarınız varsa .streamlit/secrets.toml içine yazın:
-#        EVDS_API_KEY = "xxxxxxxx"
-# =========================================================
-
-import numpy as np
-import pandas as pd
 import streamlit as st
+import pandas as pd
+import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+from sklearn.datasets import fetch_openml
+from sklearn.linear_model import PoissonRegressor, LogisticRegression
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import roc_auc_score, f1_score, mean_poisson_deviance
+import sqlite3
+from datetime import datetime
 import yfinance as yf
 import requests
+from math import erf
+from scipy.optimize import minimize
 
 # ---------------------------------------------------------
-# YARDIMCILAR
+# SAYFA YAPILANDIRMASI VE CSS STİLİ
+# ---------------------------------------------------------
+st.set_page_config(
+    page_title="Finansal Veri Bilimi & Aktüeryal Lab",
+    page_icon="💼",
+    layout="wide"
+)
+
+st.markdown("""
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+.block-container { color: #0b1f33 !important; }
+.block-container p, .block-container span, .block-container label, .block-container div, .block-container li { color: #0b1f33 !important; }
+.stApp { background-color: #f8f9fa; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; }
+header[data-testid="stHeader"] { background-color: #ffffff !important; }
+header[data-testid="stHeader"] * { color: #000000 !important; fill: #000000 !important; }
+[data-testid="collapsedControl"] svg, [data-testid="collapsedControl"] path, [data-testid="stSidebarCollapsedControl"] svg, button[kind="header"] svg { color: #000000 !important; fill: #000000 !important; }
+[data-testid="stSidebar"] { background-color: #0b1f33; color: #ffffff; }
+[data-testid="stSidebar"] .stMarkdown h1, [data-testid="stSidebar"] .stMarkdown h2, [data-testid="stSidebar"] .stMarkdown h3, [data-testid="stSidebar"] span { color: #ffffff !important; }
+h1, h2, h3, h4, h5, h6 { color: #0b1f33 !important; font-weight: 700 !important; letter-spacing: -0.5px; }
+.stSlider [data-baseweb="slider"] div[role="slider"] { background-color: #0055a5 !important; border-color: #0055a5 !important; }
+.stSlider [data-baseweb="slider"] div > div > div > div { background-color: #0055a5 !important; }
+div.stMetric { background-color: #ffffff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); border-left: 4px solid #0055a5; }
+.stButton>button { background-color: #0055a5; color: white; border-radius: 6px; border: none; padding: 0.5rem 1rem; font-weight: 600; }
+.stButton>button:hover { background-color: #003d73; color: white; }
+.model-badge { background-color: #e6f4ea; color: #1e6b34; padding: 6px 12px; border-radius: 6px; font-size: 0.85rem; display: inline-block; margin-bottom: 10px; }
+.demo-badge { background-color: #fff4e5; color: #8a5a00; padding: 6px 12px; border-radius: 6px; font-size: 0.85rem; display: inline-block; margin-bottom: 10px; }
+</style>
+""", unsafe_allow_html=True)
+
+st.sidebar.markdown("""
+    <div style="display: flex; justify-content: center; gap: 25px; margin-top: 20px; margin-bottom: 20px;">
+        <a href="https://www.linkedin.com/in/sultan-kuş/" target="_blank" style="color: #0077b5; font-size: 32px; text-decoration: none;" title="LinkedIn">
+            <i class="fab fa-linkedin"></i>
+        </a>
+        <a href="https://github.com/SultanKus" target="_blank" style="color: #ffffff; font-size: 32px; text-decoration: none;" title="GitHub">
+            <i class="fab fa-github"></i>
+        </a>
+        <a href="mailto:kussultannn34@gmail.com" style="color: #ea4335; font-size: 32px; text-decoration: none;" title="Email Gönder">
+            <i class="fas fa-envelope"></i>
+        </a>
+    </div>
+    <hr style="border-top: 1px solid #ffffff; opacity: 0.2;">
+""", unsafe_allow_html=True)
+
+# ---------------------------------------------------------
+# VERİTABANI (SQLite)
+# ---------------------------------------------------------
+def veritabani_olustur():
+    conn = sqlite3.connect('finansal_lab.db', check_same_thread=False)
+    c = conn.cursor()
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS simulasyonlar (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, tarih TEXT, modul_adi TEXT, girdi_detayi TEXT, sonuc_deger TEXT)
+    ''')
+    conn.commit()
+    conn.close()
+
+veritabani_olustur()
+
+def kayit_ekle(modul_adi, girdi_detayi, sonuc_deger):
+    conn = sqlite3.connect('finansal_lab.db', check_same_thread=False)
+    c = conn.cursor()
+    tarih = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    c.execute("INSERT INTO simulasyonlar (tarih, modul_adi, girdi_detayi, sonuc_deger) VALUES (?, ?, ?, ?)",
+              (tarih, modul_adi, girdi_detayi, sonuc_deger))
+    conn.commit()
+    conn.close()
+
+def gecmisi_getir():
+    conn = sqlite3.connect('finansal_lab.db', check_same_thread=False)
+    df = pd.read_sql("SELECT * FROM simulasyonlar ORDER BY id DESC", conn)
+    conn.close()
+    return df
+
+def model_rozeti(auc, f1, kaynak):
+    st.markdown(
+        f'<div class="model-badge">✅ Eğitilmiş model — AUC: {auc:.3f} · F1: {f1:.3f} · Kaynak: {kaynak}</div>',
+        unsafe_allow_html=True
+    )
+
+def demo_rozeti(metin="Bu sayfa kavramsal bir formül gösterimidir; canlı veri veya eğitilmiş model kullanmaz."):
+    st.markdown(f'<div class="demo-badge">🧪 {metin}</div>', unsafe_allow_html=True)
+
+def egitim_notu(icerik, baslik="📚 Bu modül nasıl çalışıyor? (Teori + Yöntem)"):
+    """Her modülün altında/üstünde açılır bir eğitim/açıklama bloğu gösterir."""
+    with st.expander(baslik):
+        st.markdown(icerik)
+
+# ---------------------------------------------------------
+# GERÇEK VERİ: KASKO (freMTPL2freq)
+# ---------------------------------------------------------
+@st.cache_data
+def varsayilan_kasko_verisi_getir():
+    dataset = fetch_openml(name='freMTPL2freq', version=1, as_frame=True, parser='auto')
+    return dataset.frame[['VehPower', 'VehAge', 'DrivAge', 'ClaimNb', 'Exposure']].dropna()
+
+@st.cache_resource
+def kasko_glm_egit():
+    """
+    Hasar frekansı için Poisson GLM (endüstri standardı yöntem).
+    Exposure, sample_weight olarak offset görevi görür: model,
+    E[ClaimNb / Exposure] = exp(X . beta) ilişkisini öğrenir.
+    """
+    df = varsayilan_kasko_verisi_getir().sample(50000, random_state=42)
+    X = df[['DrivAge', 'VehAge', 'VehPower']]
+    y = df['ClaimNb']
+    exposure = df['Exposure'].clip(lower=0.01)
+
+    X_train, X_test, y_train, y_test, exp_train, exp_test = train_test_split(
+        X, y, exposure, test_size=0.25, random_state=42
+    )
+    model = PoissonRegressor(alpha=1e-4, max_iter=500)
+    model.fit(X_train, y_train / exp_train, sample_weight=exp_train)
+
+    y_pred_test = model.predict(X_test) * exp_test
+    deviance = mean_poisson_deviance(y_test.clip(lower=1e-6), y_pred_test.clip(lower=1e-6))
+    return model, deviance, len(X_train), len(X_test)
+
+# ---------------------------------------------------------
+# SENTETİK (AMA MANTIKSAL İLİŞKİLİ) EĞİTİM VERİSİ ÜRETİCİLERİ
+# Not: Bu üreticiler rastgele etiket atamaz; hedef değişken,
+# bilinen risk faktörlerinin lojistik bir fonksiyonu olarak kurulur.
+# Gerçek şirket verisi yerine geçmez — amaç, doğru ML metodolojisini
+# (train/test split + AUC/F1 doğrulaması) dürüstçe göstermektir.
+# ---------------------------------------------------------
+def _sentetik_veri_kredi(n=4000, seed=3):
+    rng = np.random.default_rng(seed)
+    gelir = rng.normal(35000, 12000, n).clip(8000, None)
+    borc = rng.normal(10000, 8000, n).clip(0, None)
+    yas = rng.integers(20, 70, n)
+    sure_ay = rng.integers(6, 61, n)
+    oran = borc / gelir
+    logit = 3.0 * oran + 0.02 * sure_ay - 0.015 * (yas - 40) - 1.6 + rng.normal(0, 0.6, n)
+    p = 1 / (1 + np.exp(-logit))
+    y = rng.binomial(1, p)
+    return pd.DataFrame({'gelir': gelir, 'borc': borc, 'yas': yas, 'sure_ay': sure_ay, 'hedef': y})
+
+def _sentetik_veri_churn(n=4000, seed=7):
+    rng = np.random.default_rng(seed)
+    kredi_skoru = rng.integers(350, 851, n)
+    musterilik_yil = rng.integers(1, 21, n)
+    sikayet_sayisi = rng.poisson(1.2, n)
+    urun_sayisi = rng.integers(1, 6, n)
+    logit = (-0.015 * (kredi_skoru - 600)) + (-0.25 * musterilik_yil) + (0.55 * sikayet_sayisi) + (-0.35 * urun_sayisi) + rng.normal(0, 0.8, n)
+    p = 1 / (1 + np.exp(-logit))
+    y = rng.binomial(1, p)
+    return pd.DataFrame({'kredi_skoru': kredi_skoru, 'musterilik_yil': musterilik_yil,
+                          'sikayet_sayisi': sikayet_sayisi, 'urun_sayisi': urun_sayisi, 'hedef': y})
+
+def _sentetik_veri_fraud(n=4000, seed=11):
+    rng = np.random.default_rng(seed)
+    hasar_saati = rng.integers(0, 24, n)
+    police_yasi_gun = rng.integers(1, 1000, n)
+    hasar_tutari = rng.gamma(2, 3000, n)
+    onceki_hasar_sayisi = rng.poisson(0.5, n)
+    gece_faktoru = np.where((hasar_saati < 5) | (hasar_saati > 22), 1, 0)
+    logit = 1.4 * gece_faktoru - 0.004 * police_yasi_gun + 0.00015 * hasar_tutari + 0.6 * onceki_hasar_sayisi - 2.0 + rng.normal(0, 0.7, n)
+    p = 1 / (1 + np.exp(-logit))
+    y = rng.binomial(1, p)
+    return pd.DataFrame({'hasar_saati': hasar_saati, 'police_yasi_gun': police_yasi_gun,
+                          'hasar_tutari': hasar_tutari, 'onceki_hasar_sayisi': onceki_hasar_sayisi, 'hedef': y})
+
+@st.cache_resource
+def kredi_risk_modelini_egit():
+    """Önce gerçek OpenML German Credit veri setini dener; olmazsa sentetik veriye düşer (graceful degradation)."""
+    try:
+        veri = fetch_openml(name='credit-g', version=1, as_frame=True, parser='auto')
+        df = veri.frame.copy()
+        y = (df['class'] == 'bad').astype(int)
+        X = pd.get_dummies(df.drop(columns=['class']), drop_first=True)
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=42, stratify=y)
+        model = LogisticRegression(max_iter=3000, class_weight='balanced')
+        model.fit(X_train, y_train)
+        y_prob = model.predict_proba(X_test)[:, 1]
+        auc = roc_auc_score(y_test, y_prob)
+        f1 = f1_score(y_test, (y_prob > 0.5).astype(int))
+        for kolon in ['age', 'duration', 'credit_amount', 'existing_credits']:
+            if kolon not in X.columns:
+                raise KeyError(f"Beklenen sütun bulunamadı: {kolon}")
+        return {"tip": "gercek", "model": model, "kolonlar": X.columns, "varsayilan": X.median(),
+                "auc": auc, "f1": f1, "kaynak": "OpenML German Credit (credit-g)"}
+    except Exception:
+        df = _sentetik_veri_kredi()
+        X, y = df.drop(columns=['hedef']), df['hedef']
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=42, stratify=y)
+        model = LogisticRegression(max_iter=1000, class_weight='balanced')
+        model.fit(X_train, y_train)
+        y_prob = model.predict_proba(X_test)[:, 1]
+        auc = roc_auc_score(y_test, y_prob)
+        f1 = f1_score(y_test, (y_prob > 0.5).astype(int))
+        return {"tip": "sentetik", "model": model, "auc": auc, "f1": f1,
+                "kaynak": "Sentetik veri (gerçek veri setine erişilemedi)"}
+
+@st.cache_resource
+def churn_modelini_egit():
+    df = _sentetik_veri_churn()
+    X, y = df.drop(columns=['hedef']), df['hedef']
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=42, stratify=y)
+    model = LogisticRegression(max_iter=1000)
+    model.fit(X_train, y_train)
+    y_prob = model.predict_proba(X_test)[:, 1]
+    auc = roc_auc_score(y_test, y_prob)
+    f1 = f1_score(y_test, (y_prob > 0.5).astype(int))
+    return model, auc, f1
+
+@st.cache_resource
+def fraud_modelini_egit():
+    df = _sentetik_veri_fraud()
+    X, y = df.drop(columns=['hedef']), df['hedef']
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=42, stratify=y)
+    model = LogisticRegression(max_iter=1000, class_weight='balanced')
+    model.fit(X_train, y_train)
+    y_prob = model.predict_proba(X_test)[:, 1]
+    auc = roc_auc_score(y_test, y_prob)
+    f1 = f1_score(y_test, (y_prob > 0.5).astype(int))
+    return model, auc, f1
+
+# ---------------------------------------------------------
+# GERÇEK PORTFÖY OPTİMİZASYONU (Markowitz / Karesel Programlama)
+# ---------------------------------------------------------
+@st.cache_data(ttl=3600)
+def markowitz_veri_getir(hisseler, periyot="2y"):
+    """Canlı fiyat verisinden yıllıklandırılmış beklenen getiri ve kovaryans matrisini hesaplar."""
+    fiyatlar = pd.DataFrame()
+    for h in hisseler:
+        veri = yf.Ticker(h).history(period=periyot)['Close']
+        if not veri.empty:
+            fiyatlar[h] = veri
+    fiyatlar = fiyatlar.dropna()
+    getiriler = fiyatlar.pct_change().dropna()
+    ort_getiri = getiriler.mean() * 252
+    kovaryans = getiriler.cov() * 252
+    return ort_getiri, kovaryans
+
+def _portfoy_varyansi(agirliklar, kovaryans):
+    return agirliklar @ kovaryans.values @ agirliklar
+
+def min_varyans_agirliklari(kovaryans, hedef_getiri, ort_getiri):
+    """Belirli bir hedef getiriyi sağlayan minimum varyanslı portföyü SLSQP (Sequential Least Squares
+    Quadratic Programming) ile çözer — KKT koşullarını sayısal olarak sağlayan gerçek bir optimizasyondur."""
+    n = len(ort_getiri)
+    kisitlar = [
+        {'type': 'eq', 'fun': lambda w: np.sum(w) - 1},
+        {'type': 'eq', 'fun': lambda w: np.dot(w, ort_getiri) - hedef_getiri},
+    ]
+    sinirlar = tuple((0.0, 1.0) for _ in range(n))  # açığa satış yok
+    sonuc = minimize(_portfoy_varyansi, x0=np.repeat(1 / n, n), args=(kovaryans,),
+                      method='SLSQP', bounds=sinirlar, constraints=kisitlar)
+    return sonuc.x if sonuc.success else None
+
+def maksimum_sharpe_agirliklari(kovaryans, ort_getiri, risksiz_oran=0.30):
+    n = len(ort_getiri)
+    def negatif_sharpe(w):
+        getiri = np.dot(w, ort_getiri)
+        risk = np.sqrt(w @ kovaryans.values @ w)
+        return -(getiri - risksiz_oran) / risk if risk > 0 else 0
+    kisitlar = [{'type': 'eq', 'fun': lambda w: np.sum(w) - 1}]
+    sinirlar = tuple((0.0, 1.0) for _ in range(n))
+    sonuc = minimize(negatif_sharpe, x0=np.repeat(1 / n, n), method='SLSQP', bounds=sinirlar, constraints=kisitlar)
+    return sonuc.x if sonuc.success else None
+
+# ---------------------------------------------------------
+# CANLI PİYASA VERİSİ (yfinance) — Makroekonomi & Piyasalar sayfası için ortak yardımcılar
 # ---------------------------------------------------------
 def tr_sayi(x, ondalik=2):
     """1234567.89 -> '1.234.567,89' (Türkçe sayı biçimi)."""
@@ -66,9 +322,6 @@ def _rsi(seri, periyot=14):
     return 100 - (100 / (1 + rs))
 
 
-# ---------------------------------------------------------
-# CANLI PİYASA VERİSİ (yfinance)
-# ---------------------------------------------------------
 ONS_GRAM = 31.1034768  # 1 troy ons = 31.1034768 gram
 
 # Panoda ve tabloda gösterilecek enstrümanlar
@@ -131,7 +384,7 @@ def canli_piyasa_verisi_getir(sembol, periyot="1y"):
 
 @st.cache_data(ttl=1800, show_spinner=False)
 def hisse_ara(sorgu, max_sonuc=8):
-    """Yahoo Finance canlı arama servisiyle şirket adı/sembol eşleştirir."""
+    """Yahoo Finance canlı arama servisiyle şirket adı/sembol eşleştirir (gerçek zamanlı otomatik tamamlama)."""
     try:
         sonuc = yf.Search(sorgu, max_results=max_sonuc)
         quotes = getattr(sonuc, "quotes", [])
@@ -162,8 +415,7 @@ def hisse_secici(key_prefix, varsayilan="THYAO.IS"):
         secim = st.selectbox("Hisse", etiketler, key=f"{key_prefix}_sel")
         return BIST_POPULER[etiketler.index(secim)][0]
     elif mod == "Şirket Adıyla Ara (canlı)":
-        sorgu = st.text_input("Şirket adı veya sembol yazın (örn. 'Turkcell', 'Apple', 'Tesla')",
-                              key=f"{key_prefix}_q")
+        sorgu = st.text_input("Şirket adı veya sembol yazın (örn. 'Turkcell', 'Apple', 'Tesla')", key=f"{key_prefix}_q")
         if not sorgu:
             st.caption("Aramak için bir şirket adı veya sembol girin.")
             return None
@@ -178,10 +430,8 @@ def hisse_secici(key_prefix, varsayilan="THYAO.IS"):
         return st.text_input("Sembol (örn. THYAO.IS, AAPL)", value=varsayilan, key=f"{key_prefix}_manuel")
 
 
-# ---------------------------------------------------------
-# PİYASA KARTI (değer + yüzde rozeti + mini sparkline)
-# ---------------------------------------------------------
 def piyasa_karti(sutun, enstruman, seri, gun_sayisi):
+    """Değer + yüzde rozeti + mini sparkline gösteren tek bir piyasa kartı."""
     seri = seri.dropna()
     with sutun:
         if len(seri) < 2:
@@ -225,10 +475,127 @@ def piyasa_karti(sutun, enstruman, seri, gun_sayisi):
         )
         st.plotly_chart(fig, config={"displayModeBar": False}, width="stretch")
 
+# ---------------------------------------------------------
+# GENEL BAKIŞ & CANLI PİYASA SAYFALARI
+# ---------------------------------------------------------
+def ml_rehberi_sayfasi():
+    st.header("Yöntem Notları")
+    st.markdown("""
+Bu sayfa bir ders anlatımı değil; sitedeki modülleri kurarken hangi yöntemi neden seçtiğimin
+notları. Mülakatta "burada neden lojistik regresyon kullandın?" diye sorulduğunda vereceğim
+cevaplar da burada.
+""")
 
-# ---------------------------------------------------------
-# ANA SAYFA FONKSİYONU
-# ---------------------------------------------------------
+    st.subheader("Önce soru, sonra model")
+    st.markdown("""
+Modeli veri değil, sorunun kendisi belirliyor. "Bu sürücü yılda kaç hasar yapar?" dediğimde
+cevap bir sayı; "bu müşteri krediyi öder mi?" dediğimde cevap iki kategoriden biri. Birincisi
+regresyon, ikincisi sınıflandırma. Sitede Kasko modülü birinci gruba, Kredi Risk / Churn /
+Fraud modülleri ikinci gruba giriyor.
+
+Ayrım basit görünüyor ama pratikte karıştırılıyor: "temerrüt olasılığı" sürekli bir sayı
+üretir, yine de problem sınıflandırmadır — çünkü gerçek hayatta gözlemlediğin etiket 0 veya 1.
+""")
+
+    st.subheader("Neden düz regresyon değil de GLM?")
+    st.markdown("""
+Klasik doğrusal regresyon (OLS) iki şey varsayar: hata terimi normal dağılır ve tahmin
+istediği değeri alabilir. Sigorta verisinde ikisi de tutmuyor.
+
+Kasko modülündeki `ClaimNb` sütununu düşünün: poliçelerin büyük çoğunluğu 0 hasar, bir kısmı 1,
+çok azı 2 ve üzeri. Dağılım sıfıra yığılmış ve sağa çarpık. Bu veriye OLS uydurursanız model
+bazı segmentler için **negatif hasar sayısı** tahmin eder. "Bu sürücü yılda -0.04 hasar yapar"
+cümlesinin bir karşılığı yok.
+
+GLM'in çözümü, tahmini doğru aralığa sıkıştıran bir link fonksiyonu kullanmak:
+""")
+    st.latex(r"g\big(E[Y \mid X]\big) = X\beta")
+    st.markdown("""
+Poisson GLM'de `g` logaritma olduğu için tahmin `exp(Xβ)` şeklinde çıkar ve hiçbir zaman
+negatif olamaz. Lojistik regresyonda link logit'tir, çıktı 0-1 arasına hapsolur. Gamma GLM ise
+pozitif ve çarpık büyüklükler için kullanılır — hasar tutarı gibi.
+
+Aktüeryada standart kurulum, hasar sayısı için Poisson, hasar tutarı için Gamma modeli kurup
+ikisini çarpmaktır. Kasko modülünde frekans kısmı gerçek veriyle eğitilmiş durumda; tutar
+tarafı için elimdeki veri setinde sütun olmadığından o kısım varsayım olarak giriliyor ve bunu
+sayfada açıkça yazdım.
+""")
+
+    st.subheader("Eğitim ve test verisini neden ayırıyorum")
+    st.markdown("""
+Bir model, gördüğü veriyi ezberleyip henüz görmediği veride çökebilir. Bunu anlamanın tek yolu,
+modele hiç göstermediğiniz bir parça veriyi kenara ayırıp performansı orada ölçmek.
+
+Sitedeki her eğitilmiş modelde veri %75 eğitim / %25 test olarak bölünüyor ve rozette gördüğünüz
+metrik **test** kümesinden geliyor, eğitim kümesinden değil. Sınıflandırma modellerinde ayrıca
+`stratify` kullanıyorum; aksi halde azınlık sınıfı test kümesine dengesiz dağılabiliyor ve skor
+gürültülü çıkıyor.
+""")
+
+    st.subheader("Doğruluk (accuracy) neden yanıltıcı")
+    st.markdown("""
+Fraud verisinde vakaların diyelim %2'si gerçek suistimal. Hiçbir şey öğrenmeyen, her başvuruya
+"temiz" diyen bir model %98 doğruluk alır. Rakam muhteşem görünür, model tamamen işe yaramazdır.
+
+Bu yüzden dengesiz veride iki metriğe bakıyorum:
+
+**AUC**, modelin rastgele seçilmiş bir riskli ve bir risksiz kaydı doğru sıralama olasılığıdır.
+0.50 yazı tura demek, 1.00 kusursuz ayrım. Eşik değerinden (0.5 vb.) bağımsız çalıştığı için
+modelin sıralama gücünü ölçer.
+
+**F1**, kaçırdığınız gerçek vakalar (recall) ile boşuna alarm verdiğiniz temiz vakalar
+(precision) arasındaki dengeyi tek sayıya indirir. İş tarafında bu dengeyi seçmek teknik değil
+ticari bir karardır: bir fraud incelemesinin maliyeti, kaçan bir dolandırıcılığın maliyetinden
+ucuzsa recall'u yükseltmek mantıklıdır.
+
+Sayım verisinde (Kasko) bunların ikisi de anlamsız; orada **Poisson deviance** raporluyorum,
+düşük olması iyi.
+""")
+
+    st.subheader("Bazı modüllerde sentetik veri var, sebebi şu")
+    st.markdown("""
+Fraud, churn ve müşteri davranışı verisi şirket içi ve gizli. Halka açık olanlar ya çok eski,
+ya başka bir ülkenin pazarına ait, ya da hedef değişkeni bu modüllerin anlattığı şeyle
+örtüşmüyor. İki seçeneğim vardı: modülü hiç yapmamak, ya da veriyi kendim üretip bunu açıkça
+söylemek. İkincisini seçtim.
+
+Ürettiğim veri rastgele etiket atamıyor. Hedef değişken, bilinen risk faktörlerinin lojistik
+bir fonksiyonu olarak kuruluyor — örneğin churn'de müşterilik süresi uzadıkça terk olasılığı
+düşüyor, şikayet sayısı arttıkça yükseliyor. Yani model gerçek bir sinyali öğreniyor, ama o
+sinyali ben koydum. Bu şu demek: metrikler metodolojinin doğru kurulduğunu gösterir, modelin
+gerçek dünyada bu performansı vereceğini **göstermez**.
+
+Kredi Risk modülü bunun istisnası: önce gerçek bir açık veri setine (OpenML German Credit)
+bağlanmayı deniyor, erişim olmazsa aynı şeffaflıkla sentetiğe düşüyor ve rozet hangisinin
+kullanıldığını yazıyor.
+""")
+
+    st.subheader("Hangi sayfa ne kadar 'gerçek'")
+    st.markdown("""
+Sitede üç tür içerik var ve her sayfanın üstündeki rozet hangisi olduğunu söylüyor:
+
+Gerçek veriyle eğitilmiş ve test kümesinde doğrulanmış modeller (Kasko GLM, Kredi Risk),
+sektörde birebir kullanılan deterministik aktüeryal formüller (IBNR, Black-Scholes,
+Solvency II — bunlar model değil, hesap), ve metodoloji göstermek için kurulmuş kavramsal
+modüller (Telematik, CLV, stres testi).
+
+Bu ayrımı yapmasam sayfa sayısı daha etkileyici görünürdü. Ama bir kredi risk modelini bir CLV
+formülüyle aynı vitrine koymak, ikisini de değersizleştiriyor.
+""")
+
+def ana_sayfa():
+    st.title("Finansal Veri Bilimi & Aktüeryal Laboratuvarı")
+    st.markdown("---")
+    st.markdown("""
+    ### 🏛️ Platform Vizyonu
+    Bu platform üç segmentten oluşur:
+    1. **✅ Doğrulanmış ML Modelleri** — gerçek train/test ayrımı, AUC/F1 metrikleriyle raporlanan eğitilmiş modeller.
+    2. **📐 Aktüeryal Yöntemler** — sektörde birebir kullanılan matematiksel formüller (IBNR, Black-Scholes, Solvency II vb.).
+    3. **🧪 Kavramsal Vitrin** — fikir/konsept gösterimi amaçlı, henüz gerçek veriyle doğrulanmamış modüller.
+
+    Her sayfanın üstünde hangi segmentte olduğunu gösteren bir rozet bulunur.
+    """)
+
 def finansal_bilgi_sayfasi():
     st.markdown("""
     <style>
@@ -552,3 +919,982 @@ tam olarak kendisidir — yani buradaki teknik panel ile kantitatif modüller ay
                     st.caption(f"RSI {son_rsi:.0f} — nötr bölgede (30-70).")
 
             kayit_ekle("Canlı Teknik Analiz", f"{secilen_hisse} / {secilen_periyot} incelendi", "Başarılı")
+
+def veri_analizi_sayfasi():
+    st.header("Hisse Korelasyon Analizi")
+    st.caption("Yahoo Finance'ten çekilen gerçek fiyat verisiyle hesaplanır.")
+    egitim_notu("""
+Burada ölçtüğüm şey, iki hissenin fiyatının aynı gün aynı yönde mi hareket ettiği. Korelasyon
+katsayısı +1'e yakınsa ikisi neredeyse birlikte hareket ediyor demektir, 0'a yakınsa aralarında
+doğrusal bir ilişki yok, -1'e yakınsa biri çıkarken diğeri düşüyor demektir.
+
+Neden önemli? Bir portföyün riskini asıl belirleyen şey, içindeki hisselerin tek tek riski
+değil, birbirleriyle ne kadar birlikte hareket ettikleri. Beşi de bankacılık hissesi olan bir
+portföy, faiz kararı geldiğinde hepsi aynı anda düşer — çeşitlendirme sadece kağıt üzerinde
+kalır. Markowitz sayfasındaki optimizasyonun girdilerinden biri tam olarak bu matris; etkin
+sınırın şeklini kovaryans (dolayısıyla korelasyon) belirliyor.
+
+Hesapladığım şey fiyatın kendisi değil, günlük getiri (`pct_change`) korelasyonu. Fiyat
+serilerini doğrudan karşılaştırsaydım, ikisi de sadece genel piyasa trendiyle birlikte
+yükseldiği için sahte bir yüksek korelasyon çıkardı. Getiriye geçmek bu ortak trendi büyük
+ölçüde temizler.
+
+Sınırlaması: bu doğrusal (Pearson) korelasyon. Piyasa çöküşü gibi kriz anlarında hisseler
+arasındaki bağımlılık genelde sakin dönemlerden daha güçlüdür — buna korelasyon kırılması
+denir ve bu basit matris bunu yakalamaz. Kurumsal risk yönetiminde bu yüzden stres senaryoları
+ayrıca test edilir (bkz. Solvency II ve Stres Testi sayfaları).
+""")
+
+    c1, c2 = st.columns([3, 1])
+    with c1:
+        etiketler = [f"{ad} ({sembol})" for sembol, ad in BIST_POPULER]
+        secilen_etiketler = st.multiselect(
+            "Karşılaştırılacak Hisseler", etiketler, default=etiketler[:5]
+        )
+        hisse_listesi = [BIST_POPULER[etiketler.index(e)][0] for e in secilen_etiketler]
+        ekstra = st.text_input("İsteğe bağlı ek semboller (virgülle ayırın, örn. AAPL, TSLA)", value="")
+        if ekstra.strip():
+            hisse_listesi += [h.strip() for h in ekstra.split(',') if h.strip()]
+    with c2:
+        periyot = st.selectbox("Periyot", ["6mo", "1y", "2y", "5y"], index=1)
+
+    if len(hisse_listesi) < 2:
+        st.info("En az 2 hisse seçin.")
+        return
+
+    if st.button("Korelasyon Matrisini Hesapla"):
+        with st.spinner("Hisse verileri indiriliyor..."):
+            df_fiyat = pd.DataFrame()
+            basarisiz = []
+            for hisse in hisse_listesi:
+                veri = canli_piyasa_verisi_getir(hisse, periyot)
+                if not veri.empty:
+                    df_fiyat[hisse] = veri['Close']
+                else:
+                    basarisiz.append(hisse)
+
+            if basarisiz:
+                st.warning(f"Şu semboller için veri bulunamadı, hesaplamadan çıkarıldı: {', '.join(basarisiz)}")
+
+            if df_fiyat.shape[1] < 2:
+                st.error("Korelasyon hesaplamak için en az 2 hissenin verisi gerekiyor.")
+                return
+
+            df_getiri = df_fiyat.pct_change().dropna()
+            corr_matrix = df_getiri.corr()
+
+            fig = px.imshow(corr_matrix, text_auto=".2f", aspect="auto", color_continuous_scale='RdBu_r',
+                             zmin=-1, zmax=1, title=f"Günlük Getiri Korelasyonu ({periyot})")
+            st.plotly_chart(fig, width="stretch")
+
+            corr_pairs = corr_matrix.where(np.triu(np.ones(corr_matrix.shape), k=1).astype(bool)).stack()
+            if not corr_pairs.empty:
+                en_yuksek = corr_pairs.idxmax()
+                en_dusuk = corr_pairs.idxmin()
+                ortalama = corr_pairs.mean()
+
+                st.markdown("#### Okuma")
+                m1, m2, m3 = st.columns(3)
+                m1.metric("En Güçlü Birliktelik", f"{en_yuksek[0]} – {en_yuksek[1]}", f"{corr_pairs[en_yuksek]:.2f}")
+                m2.metric("En Bağımsız Çift", f"{en_dusuk[0]} – {en_dusuk[1]}", f"{corr_pairs[en_dusuk]:.2f}")
+                m3.metric("Ortalama Korelasyon", f"{ortalama:.2f}")
+
+                if ortalama > 0.6:
+                    st.caption(
+                        f"Seçilen grup genel olarak yüksek korelasyonlu (ortalama {ortalama:.2f}) — "
+                        "hepsi büyük ölçüde aynı piyasa hareketine tepki veriyor, çeşitlendirme etkisi sınırlı kalır."
+                    )
+                elif ortalama < 0.2:
+                    st.caption(
+                        f"Seçilen grup düşük korelasyonlu (ortalama {ortalama:.2f}) — "
+                        "bir arada tutulduklarında portföy riski, tek tek hisselerin riskinin toplamından belirgin şekilde düşük çıkar."
+                    )
+                else:
+                    st.caption(f"Seçilen grubun ortalama korelasyonu {ortalama:.2f} — orta düzeyde bir çeşitlendirme etkisi var.")
+
+            kayit_ekle("Hisse Korelasyonu", f"{df_fiyat.shape[1]} hisse, {periyot}", "Matris hesaplandı")
+
+# ---------------------------------------------------------
+# ✅ DOĞRULANMIŞ ML MODELLERİ
+# ---------------------------------------------------------
+def kasko_fiyatlama_sayfasi():
+    st.header("Aktüeryal Kasko Saf Prim Fiyatlama Motoru")
+    egitim_notu("""
+Burada tahmin ettiğim şey bir sayı: bir sürücünün yıl içinde kaç hasar yapacağı. Dolayısıyla
+problem regresyon. Ama düz doğrusal regresyon bu veriye uymuyor.
+
+Sebebi veri setine bakınca görünüyor. `ClaimNb` sütununda poliçelerin ezici çoğunluğu 0, bir
+kısmı 1, çok azı 2 ve üzeri. Dağılım sıfıra yığılmış, sağa çarpık ve tam sayılardan oluşuyor.
+OLS regresyonu ise hatanın normal dağıldığını ve tahminin her değeri alabileceğini varsayar —
+o modeli bu veriye uydurduğumda bazı segmentler için negatif hasar sayısı tahmin ediyor.
+"Bu sürücü yılda -0.03 hasar yapar" cümlesinin karşılığı yok.
+
+Poisson regresyonu tam da bu tip sayım verisi için var. Öğrendiği ilişki şu:
+
+`E[Hasar Sayısı] = Exposure × exp(β₀ + β₁·Yaş + β₂·AraçYaşı + β₃·MotorGücü)`
+
+Dışarıdaki `exp` (log-link) tahminin hiçbir koşulda negatife düşmemesini garantiliyor.
+
+Exposure kısmı önemli: poliçeler farklı sürelerde risk altında. Üç ay sigortalı biriyle on iki
+ay sigortalı birinin ham hasar sayısını karşılaştırmak yanıltıcı olur. Bu yüzden Exposure'ı
+`sample_weight` olarak veriyorum; model artık hasar adedini değil, birim zaman başına hasar
+oranını öğreniyor.
+
+Eksik kalan taraf şu: gerçek aktüeryal fiyatlama iki modelden oluşur — hasar *sayısını* tahmin
+eden Poisson GLM (bu sayfa) ve hasar *tutarını* tahmin eden Gamma GLM. Saf prim ikisinin
+çarpımıdır. Kullandığım veri setinde tutar sütunu olmadığı için şiddet tarafını slider ile
+varsayım olarak giriyorum. Üretimde bunun freMTPL2sev gibi bir veriyle ayrıca eğitilmesi gerekir;
+sayfada uydurulmuş bir tutar modeli varmış gibi göstermek istemedim.
+
+Metrik olarak AUC göremezsiniz, çünkü ortada sınıflandırma yok. Sayım verisinde karşılığı
+Poisson deviance: modelin tahmin ettiği dağılımla gerçek dağılım arasındaki sapma. Düşük olması iyi.
+""")
+    t1, t2, t3 = st.tabs(["📊 Uygulama Paneli", "📐 Matematiksel Model", "💼 İş Değeri"])
+    with t1:
+        with st.spinner("Poisson GLM eğitiliyor..."):
+            model, deviance, n_train, n_test = kasko_glm_egit()
+        model_rozeti(auc=float('nan'), f1=float('nan'), kaynak="freMTPL2freq (gerçek açık kaynak kasko verisi)") if False else None
+        st.markdown(
+            f'<div class="model-badge">✅ Poisson GLM — Ortalama Poisson Deviance (test): {deviance:.4f} · '
+            f'Eğitim: {n_train:,} / Test: {n_test:,} satır · Kaynak: freMTPL2freq (gerçek veri)</div>',
+            unsafe_allow_html=True
+        )
+        c1, c2 = st.columns(2)
+        with c1:
+            driv_age = st.slider("Sürücü Yaşı (DrivAge)", 18, 90, 28)
+            veh_power = st.slider("Araç Motor Gücü (VehPower)", 1, 15, 7)
+        with c2:
+            veh_age = st.slider("Araç Yaşı (VehAge)", 0, 20, 3)
+            ort_siddet = st.number_input("Ortalama Hasar Şiddeti Varsayımı (TL)", 5000, 100000, 15000, step=1000,
+                                          help="Bu veri setinde hasar tutarı yok, sadece hasar sayısı var. "
+                                               "Bu yüzden şiddet varsayımsal girilir; gerçek uygulamada ayrı bir "
+                                               "Gamma GLM ile (freMTPL2sev gibi) tahmin edilir.")
+
+        girdi_df = pd.DataFrame([[driv_age, veh_age, veh_power]], columns=['DrivAge', 'VehAge', 'VehPower'])
+        yillik_frekans = model.predict(girdi_df)[0]
+        saf_prim = yillik_frekans * ort_siddet
+        m1, m2 = st.columns(2)
+        m1.metric("Tahmini Yıllık Hasar Frekansı", f"{yillik_frekans:.4f}")
+        m2.metric("Hesaplanan Yıllık Saf Prim", f"{saf_prim:,.2f} TL")
+        kayit_ekle("Kasko Poisson GLM", f"Yaş:{driv_age}, AraçYaşı:{veh_age}, Güç:{veh_power}", f"{saf_prim:,.2f} TL")
+
+        yas_listesi = list(range(18, 81))
+        sim_frekans = model.predict(pd.DataFrame({'DrivAge': yas_listesi,
+                                                    'VehAge': [veh_age] * len(yas_listesi),
+                                                    'VehPower': [veh_power] * len(yas_listesi)}))
+        fig = go.Figure(go.Scatter(x=yas_listesi, y=sim_frekans * ort_siddet, line=dict(color='#0055a5')))
+        fig.update_layout(title="Yaşa Göre Tahmini Saf Prim (Poisson GLM)", xaxis_title="Sürücü Yaşı", yaxis_title="Saf Prim (TL)")
+        st.plotly_chart(fig, width='stretch')
+    with t2:
+        st.latex(r"E[\text{ClaimNb}_i \mid X_i] = \text{Exposure}_i \cdot \exp(X_i \beta)")
+        st.latex(r"\text{Saf Prim} = \text{Hasar Frekansı} \times \text{Hasar Şiddeti}")
+        st.markdown("Model, `sklearn.linear_model.PoissonRegressor` ile eğitilmiştir; `Exposure` değişkeni "
+                     "`sample_weight` olarak kullanılarak GLM'in offset yapısı taklit edilmiştir.")
+    with t3:
+        st.markdown("Poisson GLM, hasar sayımı verisinin doğasına (negatif olamayan, sağa çarpık) uygun "
+                     "tek yöntemdir; OLS regresyonun aksine sigorta/aktüerya sektöründe fiilen kullanılır.")
+
+def kredi_risk_sayfasi():
+    st.header("Kredi Risk Skorlama (Lojistik Regresyon)")
+    egitim_notu("""
+Bu sayfada cevap aradığım soru "ne kadar" değil, "hangisi": başvuru sahibi krediyi öder mi,
+ödemez mi. İki kategori, dolayısıyla sınıflandırma.
+
+Model çıktısı yine de bir sayı — temerrüt olasılığı. Lojistik regresyonun yaptığı iş tam olarak
+bu: skoru sigmoid fonksiyonuyla 0-1 aralığına sıkıştırmak. Düz doğrusal regresyon kullansaydım
+model 1.4 veya -0.2 gibi olasılık olarak okunamayan değerler üretirdi.
+
+Daha güçlü algoritmalar dururken neden lojistik regresyon? Çünkü bankacılıkta model yorumlanabilir
+olmak zorunda. Her katsayı, o değişkenin riski hangi yönde ve ne kadar ittiğini söylüyor. Bu
+sadece akademik bir zarafet değil; regülasyon müşteriye başvurusunun neden reddedildiğinin
+açıklanmasını istiyor ve "gradient boosting öyle dedi" kabul edilebilir bir cevap değil.
+
+`class_weight='balanced'` ayarı burada kritik. Gerçek kredi portföyünde temerrüde düşen müşteri
+azınlıkta. Bu ayar olmadan model çoğunluğu ezberleyip herkese "iyi müşteri" demeyi öğrenebilir —
+yüksek doğruluk, sıfır fayda. Ağırlıklandırma, azınlık sınıfındaki hataları modele daha pahalıya
+mal ediyor.
+
+Raporladığım iki metrik: AUC, modelin rastgele seçilmiş bir iyi ve bir kötü müşteriyi doğru
+sıralama olasılığı (0.50 yazı tura, 1.00 kusursuz). F1 ise kaçırılan kötü müşterilerle boşuna
+reddedilen iyi müşteriler arasındaki dengeyi ölçüyor. Dengesiz veride ham doğruluğa bakmak
+anlamsız olduğu için ikisini birlikte veriyorum, ikisi de test kümesinden.
+""")
+    sonuc = kredi_risk_modelini_egit()
+    model_rozeti(sonuc['auc'], sonuc['f1'], sonuc['kaynak'])
+
+    if sonuc['tip'] == 'gercek':
+        c1, c2 = st.columns(2)
+        with c1:
+            yas = st.slider("Yaş", 18, 75, 35)
+            sure_ay = st.slider("Kredi Vadesi (Ay)", 6, 72, 24)
+        with c2:
+            tutar = st.number_input("Kredi Tutarı (Yerel Para Birimi)", 500, 20000, 3000, step=100)
+            mevcut_kredi = st.slider("Mevcut Kredi Sayısı", 1, 4, 1)
+        girdi = sonuc['varsayilan'].copy()
+        for kolon, deger in [('age', yas), ('duration', sure_ay), ('credit_amount', tutar), ('existing_credits', mevcut_kredi)]:
+            if kolon in girdi.index:
+                girdi[kolon] = deger
+        X_girdi = pd.DataFrame([girdi])[sonuc['kolonlar']]
+        risk_skoru = sonuc['model'].predict_proba(X_girdi)[0, 1] * 100
+    else:
+        gelir = st.number_input("Aylık Gelir (TL)", 8000, 200000, 35000, step=1000)
+        borc = st.number_input("Mevcut Kredi Borcu (TL)", 0, 500000, 10000, step=1000)
+        yas = st.slider("Yaş", 18, 75, 35)
+        sure_ay = st.slider("Kredi Vadesi (Ay)", 6, 60, 24)
+        X_girdi = pd.DataFrame([[gelir, borc, yas, sure_ay]], columns=['gelir', 'borc', 'yas', 'sure_ay'])
+        risk_skoru = sonuc['model'].predict_proba(X_girdi)[0, 1] * 100
+
+    st.metric("Temerrüt (Default) Olasılığı", f"%{risk_skoru:.1f}")
+    if risk_skoru > 50:
+        st.error("⚠️ Yüksek risk — manuel inceleme önerilir.")
+    if st.button("Riski Kaydet"):
+        kayit_ekle("Kredi Risk Skoru (LogReg)", "girdi kaydedildi", f"%{risk_skoru:.1f}")
+        st.success("Veritabanına kaydedildi.")
+
+def churn_sayfasi():
+    st.header("Müşteri Kaybı (Churn) Erken Uyarı Sistemi")
+    egitim_notu("""
+Yöntem olarak Kredi Risk sayfasındakiyle aynı yerdeyiz — lojistik regresyon, iki sınıf. Değişen
+şey girdiler.
+
+Kredi modelinde ağırlıklı olarak finansal durum verisi vardı. Churn'de işe yarayan sinyaller
+davranışsal: müşterilik süresi, şikayet sayısı, sahip olunan ürün adedi. Sektörde genel kabul,
+demografik bilginin churn tahmininde zayıf kaldığı yönünde — kimin gideceğini yaşı değil, son
+haftalardaki davranış değişimi haber veriyor. Kullanım sıklığındaki düşüş, arka arkaya açılan
+destek kaydı, tek ürüne inme gibi.
+
+Ürün sayısının etkisi burada özellikle görünür durumda. Birden fazla ürünü olan müşterinin
+ayrılması daha maliyetli ve daha zahmetli; bu yüzden ürün sayısı arttıkça terk olasılığı
+düşüyor. Bankacılıkta "çapraz satış müşteriyi bağlar" sezgisinin sayısal karşılığı bu.
+
+Churn de dengesiz bir problem — çoğu müşteri kalır. O yüzden accuracy yerine yine AUC ve F1
+raporluyorum.
+""")
+    model, auc, f1 = churn_modelini_egit()
+    model_rozeti(auc, f1, "Sentetik veri (metodoloji gösterimi — bkz. not aşağıda)")
+    demo_rozeti("Gerçek şirket verisi yerine, bilinen churn risk faktörlerinin (kısa müşterilik süresi, "
+                "düşük kredi skoru, yüksek şikayet sayısı) lojistik ilişkisiyle üretilmiş sentetik veri kullanılmıştır. "
+                "Üretimde şirketin gerçek CRM/işlem verisiyle yeniden eğitilmelidir.")
+    kredi_skoru = st.slider("Kredi Skoru", 350, 850, 650)
+    aktif_yil = st.slider("Müşterilik Süresi (Yıl)", 1, 20, 3)
+    sikayet_sayisi = st.slider("Son 1 Yıldaki Şikayet Sayısı", 0, 10, 1)
+    urun_sayisi = st.slider("Sahip Olduğu Ürün Sayısı", 1, 5, 2)
+    X_girdi = pd.DataFrame([[kredi_skoru, aktif_yil, sikayet_sayisi, urun_sayisi]],
+                            columns=['kredi_skoru', 'musterilik_yil', 'sikayet_sayisi', 'urun_sayisi'])
+    churn_prob = model.predict_proba(X_girdi)[0, 1] * 100
+    st.metric("Terk (Churn) Olasılığı", f"%{churn_prob:.1f}")
+    if st.button("Analizi Kaydet"):
+        kayit_ekle("Churn Skoru (LogReg)", f"Skor:{kredi_skoru}, Yıl:{aktif_yil}", f"%{churn_prob:.1f}")
+        st.success("Veritabanına kaydedildi.")
+
+def fraud_sayfasi():
+    st.header("ML Hasar Suistimali (Fraud) Uyarı Sistemi")
+    egitim_notu("""
+Yine sınıflandırma, ama fraud'da dengesizlik başka bir boyutta. Gerçek portföylerde suistimalli
+hasar oranı çoğu zaman %1-2'yi bulmaz. Bu şu tuhaf sonucu doğurur: hiçbir şey öğrenmeyen, her
+dosyaya "temiz" diyen bir model %98 doğruluk alır. Metrik seçimi burada modelin kendisinden
+daha kritik hale geliyor.
+
+Sayfadaki model lojistik regresyon ve metodolojiyi doğru kuruyor: train/test ayrımı var, metrik
+test kümesinden geliyor, azınlık sınıfı ağırlıklandırılmış. Ama üretim kalitesinde bir fraud
+sistemi için tek başına yeterli olmadığını söylemem lazım. Sahada tipik olarak SMOTE benzeri
+örnekleme teknikleri, anomali tespiti için isolation forest veya doğrusal olmayan etkileşimleri
+yakalayan gradient boosting (XGBoost, LightGBM) tercih ediliyor.
+
+Bir de modelin kendisinden bağımsız bir sorun var: fraud verisinde etiket güvenilmezdir.
+"Fraud değil" diye işaretlenen dosyaların bir kısmı aslında yakalanamamış fraud'dur. Yani model
+gerçek suistimali değil, şirketin geçmişte *tespit edebildiği* suistimali öğrenir. Bu yüzden
+fraud modelleri genelde tek başına karar vermez; insan incelemesine düşecek dosyaları önceliklendirir.
+""")
+    model, auc, f1 = fraud_modelini_egit()
+    model_rozeti(auc, f1, "Sentetik veri (metodoloji gösterimi — bkz. not aşağıda)")
+    demo_rozeti("Gerçek fraud verisi genellikle gizlidir; burada gece saatleri, yeni poliçe, yüksek hasar tutarı "
+                "ve tekrarlayan hasar geçmişi gibi bilinen risk sinyalleriyle üretilmiş sentetik veri kullanılmıştır. "
+                "Üretimde şirketin etiketlenmiş gerçek hasar geçmişiyle yeniden eğitilmelidir.")
+    hasar_saati = st.slider("Hasar Saati", 0, 23, 2)
+    police_yasi = st.slider("Poliçe Yaşı (Gün)", 1, 999, 10)
+    hasar_tutari = st.number_input("Bildirilen Hasar Tutarı (TL)", 500, 200000, 15000, step=500)
+    onceki_hasar = st.slider("Son 2 Yıldaki Hasar Sayısı", 0, 5, 0)
+    X_girdi = pd.DataFrame([[hasar_saati, police_yasi, hasar_tutari, onceki_hasar]],
+                            columns=['hasar_saati', 'police_yasi_gun', 'hasar_tutari', 'onceki_hasar_sayisi'])
+    skor = model.predict_proba(X_girdi)[0, 1] * 100
+    st.metric("Fraud Olasılık Skoru", f"%{skor:.1f}")
+    if skor > 50:
+        st.error("⚠️ İnceleme Gerekli!")
+    if st.button("Sisteme Kaydet"):
+        kayit_ekle("Fraud Modeli (LogReg)", f"Saat:{hasar_saati}, PoliçeYaşı:{police_yasi}", f"%{skor:.1f} Risk")
+        st.success("Loglandı.")
+
+# ---------------------------------------------------------
+# 📐 AKTÜERYAL YÖNTEMLER (gerçek formüller, deterministik)
+# ---------------------------------------------------------
+def ibnr_sayfasi():
+    st.header("IBNR (Chain Ladder) Muallak Hasar Rezervi Aracı")
+    demo_rozeti("Bu modül deterministik bir aktüeryal yöntemdir (Chain Ladder); ML modeli değildir.")
+    egitim_notu("""
+**Bu bir makine öğrenmesi modeli değil, klasik bir aktüeryal projeksiyon yöntemidir.** Chain Ladder, geçmiş
+kaza yıllarının hasar gelişim örüntüsünün (bir yıldan diğerine kümülatif hasarın nasıl büyüdüğü) gelecekte de
+benzer şekilde devam edeceği varsayımına dayanır. Her gelişim yılı için bir "link ratio" (`f_j`) hesaplanır ve
+henüz tamamlanmamış (eksik) hücreler bu oranlarla projekte edilir — sonuç, o kaza yılının "nihai" hasar
+tutarıdır. IBNR (Incurred But Not Reported), bu nihai tahmin ile şimdiye kadar ödenen tutar arasındaki farktır.
+
+**Sınırlaması:** Yöntem, geçmiş gelişim örüntüsünün stabil kaldığını varsayar; enflasyon şoku veya poliçe
+koşullarındaki ani değişimler bu varsayımı bozar ve daha gelişmiş yöntemler (Bornhuetter-Ferguson, GLM tabanlı
+rezervleme) gerektirir.
+""")
+    t1, t2, t3 = st.tabs(["📊 Uygulama Paneli", "📐 Matematiksel Model", "💼 İş Değeri"])
+    with t1:
+        st.info("Hasar gelişim üçgeni verinizi yükleyerek (CSV/Excel) IBNR rezerv hesaplamasını başlatın.")
+        yuklenen_dosya = st.file_uploader("📂 Hasar Gelişim Üçgeni Yükle", type=["csv", "xlsx"], key="ibnr_up")
+        if yuklenen_dosya is not None:
+            df = pd.read_csv(yuklenen_dosya, index_col=0) if yuklenen_dosya.name.endswith('.csv') else pd.read_excel(yuklenen_dosya, index_col=0)
+        else:
+            df = pd.DataFrame({
+                'Gelisim_1': [5000, 5500, 6000, 6500, 7200],
+                'Gelisim_2': [7500, 8000, 8800, 9500, np.nan],
+                'Gelisim_3': [8500, 9200, 10000, np.nan, np.nan],
+                'Gelisim_4': [9000, 9800, np.nan, np.nan, np.nan],
+                'Gelisim_5': [9200, np.nan, np.nan, np.nan, np.nan]
+            }, index=['2019', '2020', '2021', '2022', '2023'])
+        st.write("**Mevcut Hasar Üçgeni (Kümülatif)**")
+        st.dataframe(df)
+        if st.button("IBNR Rezervini Hesapla"):
+            n = len(df)
+            f_factors = []
+            for j in range(n - 1):
+                sum_y_j1, sum_y_j = df.iloc[:n - 1 - j, j + 1].sum(), df.iloc[:n - 1 - j, j].sum()
+                f_factors.append(sum_y_j1 / sum_y_j if sum_y_j != 0 else 1)
+            df_proj = df.copy()
+            for i in range(1, n):
+                for j in range(n - i, n):
+                    df_proj.iloc[i, j] = df_proj.iloc[i, j - 1] * f_factors[j - 1]
+            ibnr = df_proj.iloc[:, -1].sum() - np.nansum(np.diag(df.values[::-1]))
+            st.metric("Hesaplanan Toplam IBNR Rezervi", f"{ibnr:,.2f} TL")
+            kayit_ekle("IBNR Rezervi", "Chain Ladder Projeksiyonu", f"{ibnr:,.2f} TL")
+            fig = go.Figure()
+            for index, row in df_proj.iterrows():
+                fig.add_trace(go.Scatter(x=df_proj.columns, y=row, mode='lines+markers', name=str(index)))
+            fig.update_layout(title="Kaza Yıllarına Göre Hasar Gelişim Projeksiyonu", xaxis_title="Gelişim Yılı", yaxis_title="Kümülatif Hasar (TL)")
+            st.plotly_chart(fig, width='stretch')
+    with t2:
+        st.latex(r"f_j = \frac{\sum_{i=1}^{n-j} C_{i, j+1}}{\sum_{i=1}^{n-j} C_{i, j}}")
+    with t3:
+        st.markdown("Bilançodaki en büyük yükümlülük kalemini doğru tahmin ederek Solvency rasyolarının SEDDK regülasyonlarına uyumunu sağlar.")
+
+def hayat_sigortasi_sayfasi():
+    st.header("Hayat Sigortası ve Aktüeryal Anüite Fiyatlama Motoru")
+    demo_rozeti("Basitleştirilmiş sabit mortalite varsayımı kullanır; gerçek uygulamada CSO/TRH gibi resmi mortalite tabloları kullanılır.")
+    egitim_notu("""
+**Bu da bir makine öğrenmesi modeli değil, aktüeryal bir bugünkü değer (present value) hesabıdır.**
+Fikir şudur: müşteri öldüğünde şirketin ödeyeceği teminatın **bugünkü karşılığı** ne kadar olmalı ki, alınan
+tek prim uzun vadede beklenen ödemeyi karşılasın?
+
+**Formüldeki üç bileşen:**
+- **`q_x` (ölüm olasılığı):** Belirli yaştaki bir kişinin o yıl içinde ölme olasılığı — gerçek uygulamada
+  yaşa, cinsiyete ve sigara/sağlık durumuna göre değişen resmi **mortalite tablolarından** (Türkiye'de TRH 2010,
+  uluslararası CSO tabloları) okunur. Bu demoda basitleştirilmiş sabit bir değer kullanılıyor.
+- **`v^t` (iskonto faktörü):** Paranın zaman değeri — gelecekteki 1 TL'nin bugünkü karşılığı, teknik faiz
+  oranıyla iskonto edilir (`v = 1/(1+i)`).
+- **`_t p_x` (yaşama olasılığı):** Kişinin t yıl daha hayatta kalma olasılığı.
+
+**Neden önemli?** Bu üçünün çarpımı toplanarak (**aktüeryal bugünkü değer**), şirketin karşılayacağı beklenen
+yükümlülüğün bugünkü tutarı bulunur — hayat sigortası ve emeklilik fiyatlamasının temelidir.
+""")
+    t1, t2, t3 = st.tabs(["📊 Uygulama Paneli", "📐 Matematiksel Model", "💼 İş Değeri"])
+    with t1:
+        col1, col2 = st.columns(2)
+        with col1:
+            yas = st.slider("Müşteri Yaşı", 20, 80, 35)
+            cinsiyet = st.selectbox("Cinsiyet", ["Erkek", "Kadın"])
+        with col2:
+            teknik_faiz = st.slider("Teknik Faiz Oranı (%)", 1.0, 15.0, 3.5)
+            teminat = st.number_input("Ölüm Teminatı (TL)", 100000, 5000000, 500000)
+        if st.button("Aktüeryal Fiyatlamayı Çalıştır"):
+            q_x = 0.0015 if cinsiyet == "Erkek" else 0.0011
+            iskonto = 1 / (1 + teknik_faiz / 100)
+            nsp = teminat * q_x * iskonto * (80 - yas) * 0.4
+            st.metric("Hayat Sigortası Net Tek Prim", f"{nsp:,.2f} TL")
+            kayit_ekle("Hayat Sigortası", f"Yaş:{yas}, Cinsiyet:{cinsiyet}", f"NSP: {nsp:,.2f} TL")
+    with t2:
+        st.latex(r"A_x = \sum_{t=0}^{\infty} v^{t+1} \cdot _{t}p_x \cdot q_{x+t}")
+    with t3:
+        st.markdown("Mortalite risklerinin matematiksel kesinlikle fiyatlanması, hayat/BES portföyünde kârlılığı korur.")
+
+def hasar_frekans_sayfasi():
+    st.header("Hasar Frekansı & Portföy Dağılımı")
+    demo_rozeti("Gerçek freMTPL2freq verisi üzerinde tanımlayıcı (descriptive) istatistiktir; tahmin modeli için Kasko GLM sayfasına bakın.")
+    egitim_notu("""
+**Bu sayfa bir model değil, betimsel istatistiktir (descriptive statistics)** — yani veriyi olduğu gibi
+özetler, gelecek tahmini yapmaz (o iş Kasko GLM sayfasında).
+
+**Neden ortalama değil, `Toplam Hasar / Toplam Exposure` oranı kullanılıyor?** Her poliçe farklı sürelerde
+(exposure) risk altındadır — 3 ay sigortalı biriyle 12 ay sigortalı birinin hasar sayısını doğrudan karşılaştırmak
+yanıltıcıdır. Aktüeryada frekans her zaman **"birim zamana normalize edilmiş"** olarak hesaplanır; bu da
+segmentler arası adil karşılaştırmayı sağlar (örn. genç sürücü grubu gerçekten mi daha riskli, yoksa
+sadece daha kısa süredir mi poliçesi var?).
+""")
+    df_hesap = varsayilan_kasko_verisi_getir()
+    toplam_hasar, toplam_exposure = df_hesap['ClaimNb'].sum(), df_hesap['Exposure'].sum()
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Toplam Hasar Adedi", f"{toplam_hasar:,.0f}")
+    c2.metric("Toplam Poliçe Yılı", f"{toplam_exposure:,.2f}")
+    c3.metric("Genel Portföy Frekansı", f"%{(toplam_hasar / toplam_exposure) * 100:.2f}")
+    yas_gruplari = df_hesap.groupby('DrivAge').agg({'ClaimNb': 'sum', 'Exposure': 'sum'}).reset_index()
+    yas_gruplari = yas_gruplari[yas_gruplari['Exposure'] > 0]
+    yas_gruplari['Frekans'] = yas_gruplari['ClaimNb'] / yas_gruplari['Exposure']
+    fig = px.line(yas_gruplari, x='DrivAge', y='Frekans', title="Yaş Bazlı Gerçek Hasar Frekansı", markers=True)
+    st.plotly_chart(fig, width='stretch')
+
+def monte_carlo_sayfasi():
+    st.header("Monte Carlo ile Toplu Hasar Simülatörü")
+    demo_rozeti("Parametrik varsayımlarla (Poisson frekans / Lognormal şiddet) çalışan gerçek bir simülasyon yöntemidir.")
+    egitim_notu("""
+**Neden simülasyon, neden kapalı formül değil?** Bir yıldaki toplam hasar, rastgele sayıda hasarın
+(`N ~ Poisson`) her birinin rastgele bir tutarının (`X ~ Lognormal`) toplamıdır. Bu "bileşik dağılımın"
+(compound distribution) kapalı-form bir formülü genelde yoktur; bu yüzden binlerce senaryo rastgele üretilip
+(Monte Carlo) sonuçların dağılımına bakılır. Bu yaklaşım, sigorta şirketlerinin sermaye yeterliliği ve
+reasürans ihtiyacı hesaplarında (iç model / Solvency II) fiilen kullanılır.
+
+**%99 VaR ne anlama gelir?** "Vakaların %99'unda toplam hasar bu tutarı geçmez" demektir; kalan %1'lik kuyruk,
+şirketin kendi öz kaynağıyla veya reasürans ile karşılaması gereken aşırı senaryodur.
+""")
+    frekans = st.slider("Beklenen Hasar Sayısı (Poisson)", 100, 5000, 1000)
+    siddet_mu = st.slider("Ortalama Hasar Şiddeti (Lognormal, log-ölçek)", 5.0, 15.0, 9.0)
+    if st.button("Simülasyonu Başlat"):
+        rng = np.random.default_rng(42)
+        sim_sonuclar = [np.sum(rng.lognormal(mean=siddet_mu, sigma=1.2, size=rng.poisson(frekans))) for _ in range(1000)]
+        var_99 = np.percentile(sim_sonuclar, 99)
+        st.plotly_chart(px.histogram(sim_sonuclar, nbins=50, title="1 Yıllık Toplam Hasar Dağılımı"), width="stretch")
+        st.metric("%99 VaR (İflas Riski Sınırı)", f"{var_99:,.0f} TL")
+        kayit_ekle("Monte Carlo", f"Frekans:{frekans}, Mu:{siddet_mu}", f"VaR: {var_99:,.0f} TL")
+    st.latex(r"S = \sum_{i=1}^{N} X_i \quad (N \sim Poisson,\ X \sim Lognormal)")
+
+def solvency_sayfasi():
+    st.header("Solvency II Sermaye Yeterliliği (Basitleştirilmiş Standart Formül)")
+    demo_rozeti("Korelasyon katsayısı (0.25) EIOPA standart formülünün basitleştirilmiş bir yaklaşımıdır.")
+    egitim_notu("""
+**Bu bölüm bir istatistiksel model değil, Avrupa Birliği'nin Solvency II sigorta regülasyonundan gelen bir
+sermaye yeterliliği formülüdür.** Fikir: bir sigorta şirketi piyasa riski, kredi riski ve hayat-dışı sigorta
+riski gibi farklı risklere maruzdur; bunları basitçe toplarsak (`Mkt + Kredi + HayatDışı`) gerçekte olmayan bir
+"hepsi aynı anda gerçekleşir" varsayımı yapmış oluruz.
+
+**Neden karekök içinde toplama (kareler toplamı) kullanılıyor?** Bu, istatistikteki **çeşitlendirme etkisini**
+(diversification benefit) modellemenin standart yoludur — riskler birbiriyle tam ilişkili değilse (örn.
+piyasa çöktüğünde hayat-dışı hasarlar otomatik artmaz), toplam risk, tek tek risklerin aritmetik toplamından
+daha küçük çıkar. `Corr_{i,j}` matrisi, iki riskin ne kadar birlikte hareket ettiğini gösterir; bu demoda
+sabit 0.25 kullanılıyor, EIOPA'nın gerçek standart formülünde her risk çifti için ayrı bir katsayı vardır.
+
+**BSCR (Basic Solvency Capital Requirement):** Şirketin, 1 yıl içinde %99.5 güvenle iflas etmemesi için elinde
+bulundurması gereken minimum öz kaynak tutarıdır.
+""")
+    t1, t2, t3 = st.tabs(["📊 Uygulama Paneli", "📐 Matematiksel Model", "💼 İş Değeri"])
+    with t1:
+        mkt_risk = st.number_input("Piyasa Riski", value=15000000)
+        def_risk = st.number_input("Kredi Riski", value=5000000)
+        nl_risk = st.number_input("Hayat Dışı Risk", value=20000000)
+        bscr = np.sqrt(mkt_risk**2 + def_risk**2 + nl_risk**2 + 2 * 0.25 * (mkt_risk * def_risk + mkt_risk * nl_risk + def_risk * nl_risk))
+        st.metric("Gerekli Temel Özkaynak (BSCR)", f"{bscr:,.0f} TL")
+        kayit_ekle("Solvency II", f"Mkt:{mkt_risk}, Kredi:{def_risk}, HayatDışı:{nl_risk}", f"BSCR: {bscr:,.0f} TL")
+    with t2:
+        st.latex(r"BSCR = \sqrt{ \sum_i \sum_j Corr_{i,j} \cdot SCR_i \cdot SCR_j }")
+    with t3:
+        st.markdown("Şirketi lisans iptallerinden kurtarır, rasyonel risk yönetimi kültürü inşa eder.")
+
+def black_scholes_sayfasi():
+    st.header("Black-Scholes Opsiyon Fiyatlama")
+    egitim_notu("""
+**Bu, kapalı-form (closed-form) analitik bir çözümdür** — Monte Carlo gibi simülasyona gerek kalmadan, tek bir
+formülle "adil" opsiyon fiyatı hesaplanır. 1973'te Black, Scholes ve Merton tarafından geliştirildi ve hâlâ
+türev ürün fiyatlamasının temel taşıdır.
+
+**Sezgi:** Bir opsiyonun (call/put) değeri, dayanak varlığın (`S`) gelecekteki fiyatının, kullanım fiyatını
+(`K`) aşma **olasılığına** ve aştığında ne kadar aşacağına bağlıdır. Model, hisse fiyatının **geometrik
+Brown hareketi** izlediğini (yani logaritmik getirilerin normal dağıldığını) varsayar; `N(d1)` ve `N(d2)`
+terimleri standart normal dağılımın kümülatif fonksiyonudur ve bu olasılıkları temsil eder.
+
+**Gerçekçi sınırlamalar (mülakatta sorulabilir):** Model sabit volatilite (`σ`) ve sabit faiz oranı varsayar;
+gerçek piyasalarda volatilite zamana ve strike'a göre değişir ("volatility smile/skew"), bu yüzden kurumsal
+masalarda Black-Scholes bir başlangıç noktasıdır, tek başına yeterli değildir.
+""")
+    t1, t2, t3 = st.tabs(["📊 Uygulama Paneli", "📐 Matematiksel Model", "💼 İş Değeri"])
+    with t1:
+        c1, c2 = st.columns(2)
+        with c1:
+            S = st.number_input("Spot (S)", value=100.0)
+            K = st.number_input("Strike (K)", value=100.0)
+            T = st.slider("Vade (Yıl)", 0.05, 5.0, 1.0)
+        with c2:
+            r = st.slider("Faiz (%)", 1, 50, 15) / 100
+            sigma = st.slider("Volatilite (%)", 5, 100, 25) / 100
+            opt_tipi = st.selectbox("Opsiyon Tipi", ["Call", "Put"])
+        d1 = (np.log(S / K) + (r + 0.5 * sigma**2) * T) / (sigma * np.sqrt(T))
+        d2 = d1 - sigma * np.sqrt(T)
+        norm_cdf = lambda x: (1.0 + erf(x / np.sqrt(2.0))) / 2.0
+        fiyat = (S * norm_cdf(d1) - K * np.exp(-r * T) * norm_cdf(d2)) if opt_tipi == "Call" \
+            else (K * np.exp(-r * T) * norm_cdf(-d2) - S * norm_cdf(-d1))
+        st.metric("Teorik Opsiyon Primi", f"{fiyat:,.2f}")
+        kayit_ekle("Black-Scholes", f"S:{S}, K:{K}, T:{T}, {opt_tipi}", f"{fiyat:,.2f}")
+    with t2:
+        st.latex(r"d_1 = \frac{\ln(S/K) + (r + \sigma^2 / 2)T}{\sigma \sqrt{T}}")
+        st.latex(r"d_2 = d_1 - \sigma \sqrt{T}")
+        st.latex(r"C = S_t N(d_1) - K e^{-rT} N(d_2)")
+    with t3:
+        st.markdown("Kurumsal hazine departmanları için standart bir Risk Hedging (korunma) aracıdır.")
+
+def kredi_var_sayfasi():
+    st.header("Kredi Portföyü VaR Hesaplayıcı (Parametrik VaR)")
+    demo_rozeti("Parametrik (varyans-kovaryans) VaR yöntemidir; kuyruk riskini (tail risk) tam yakalamaz.")
+    egitim_notu("""
+**VaR (Value at Risk), "belirli bir güven düzeyinde, belirli bir sürede en fazla ne kadar kaybedebilirim?"**
+sorusuna cevap verir. Bu sayfa **parametrik (analitik) VaR** kullanır — yani kaybın normal dağıldığını varsayıp
+tek bir formülle hesaplar; alternatifi, Monte Carlo sayfasında gördüğün gibi binlerce senaryo simüle etmektir
+(**tarihsel VaR** veya **Monte Carlo VaR**).
+
+**Formüldeki `z_α` nereden geliyor?** Standart normal dağılımın belirli bir güven düzeyine karşılık gelen
+kuantilidir (`%95` için `1.65`, `%99` için `2.33`) — "dağılımın bu noktasından sonrasına düşme olasılığı
+%5/%1'dir" demektir. `√T` terimi ise riskin zamanla karekök kuralına göre büyüdüğü varsayımıdır (günlük
+volatiliteden 10 günlük volatiliteye geçiş).
+
+**En büyük eleştirisi:** Parametrik VaR, gerçek piyasa kayıplarının normal dağılımdan çok daha "kalın kuyruklu"
+(fat-tailed) olduğunu göz ardı eder — 2008 krizi gibi aşırı olayları hafife alır. Bu yüzden kurumlar VaR'ı tek
+başına değil, stres testi ve Monte Carlo ile birlikte kullanır.
+""")
+    t1, t2, t3 = st.tabs(["📊 Uygulama Paneli", "📐 Matematiksel Model", "💼 İş Değeri"])
+    with t1:
+        portfoy = st.number_input("Kredi Portföyü (TL)", value=50000000)
+        guven = st.selectbox("Güven Aralığı", ["%95", "%99"])
+        z_skor = 1.65 if "%95" in guven else 2.33
+        volatilite = st.slider("Yıllık Portföy Volatilitesi (%)", 1, 40, 12) / 100
+        var_degeri = portfoy * z_skor * volatilite / np.sqrt(252) * np.sqrt(10)
+        st.metric("10 Günlük Portföy VaR", f"{var_degeri:,.0f} TL")
+        kayit_ekle("Kredi VaR", f"Portföy:{portfoy}, Güven:{guven}", f"VaR: {var_degeri:,.0f} TL")
+    with t2:
+        st.latex(r"VaR = V_p \cdot z_{\alpha} \cdot \sigma_p \cdot \sqrt{T}")
+    with t3:
+        st.markdown("Yönetim kurulunun risk iştahını matematiksel olarak sınırlandırır.")
+
+def reasurans_sayfasi():
+    st.header("Dinamik Reasürans Optimizasyonu (Excess of Loss)")
+    egitim_notu("""
+**Reasürans, sigorta şirketinin kendi sigortasıdır** — büyük bir felaket (deprem, sel vb.) olduğunda tüm
+hasarı tek başına karşılamak yerine, riskin bir kısmını bir başka şirkete (reasüröre) devreder.
+
+**Excess of Loss (XoL) mantığı:** Şirket, "saklama payı" (retention) adı verilen bir eşiği kendisi üstlenir;
+bu eşiğin üzerindeki her TL, reasüröre devredilir. Formül basit bir eşik fonksiyonudur
+(`max(0, Brüt Hasar − Saklama Payı)`), ama gerçek hayatta bu eşik ve devredilen oran, aktüeryal olarak
+şirketin sermaye yapısına, risk iştahına ve reasürans maliyetine göre optimize edilir — "dinamik" kelimesi
+buradan gelir: saklama payı sabit değil, piyasa koşullarına göre yeniden hesaplanabilir bir değişkendir.
+
+**Neden önemli?** Saklama payı çok düşük seçilirse şirket gereğinden fazla prim reasüröre öder (kârdan
+kaybeder); çok yüksek seçilirse büyük bir felaket şirketi iflasa sürükleyebilir. Bu modül, bu dengeyi görsel
+olarak keşfetmeyi sağlıyor.
+""")
+    t1, t2, t3 = st.tabs(["📊 Uygulama Paneli", "📐 Matematiksel Model", "💼 İş Değeri"])
+    with t1:
+        brut_hasar = st.slider("Afet Hasarı (Milyon TL)", 10, 500, 150)
+        retention = st.slider("Saklama Payı (Milyon TL)", 1, 100, 25)
+        devir = max(0, brut_hasar - retention)
+        st.metric("Reasüröre Devredilen Hasar", f"{devir} Milyon TL")
+        kayit_ekle("Reasürans", f"Brüt:{brut_hasar}, Saklama:{retention}", f"{devir} Milyon TL")
+    with t2:
+        st.latex(r"\text{Reasürör Payı} = \max(0, \text{Brüt Hasar} - \text{Saklama Payı})")
+    with t3:
+        st.markdown("Katastrofik riskler karşısında şirketin iflas etmesini engeller (Excess of Loss anlaşması).")
+
+# ---------------------------------------------------------
+# 🧪 KAVRAMSAL VİTRİN (formül gösterimi, henüz gerçek veriyle doğrulanmamış)
+# ---------------------------------------------------------
+def stres_testi_sayfasi():
+    st.header("Aktüeryal Stres Testi ve Duyarlılık Matrisi")
+    demo_rozeti()
+    egitim_notu("""
+**Stres testi, bir modelin çıktısı değil, "ne olursa ne olur?" sorusuna verilen sistematik bir cevaptır**
+(senaryo analizi). Solvency II ve BDDK regülasyonları, şirketlerden düzenli olarak "aşırı ama makul" (severe
+but plausible) senaryolar altında sermaye yeterliliğini test etmesini ister — örn. "enflasyon %20 artarsa,
+faiz 5 puan düşerse ne olur?".
+
+**Neden önemli?** Ortalama/beklenen senaryo altında sağlıklı görünen bir şirket, kuyruk (tail) senaryolarında
+iflas edebilir. Bu sayfadaki formül basitleştirilmiş bir duyarlılık fonksiyonudur; gerçek stres testleri
+genelde tarihsel kriz senaryolarının (2008, 2018 kur şoku vb.) tekrar oynatılmasına (historical scenario
+replay) veya çok değişkenli Monte Carlo simülasyonlarına dayanır.
+""")
+    enflasyon_soku = st.slider("Enflasyon Artış Şoku (%)", 0, 50, 20)
+    faiz_soku = st.slider("Faiz Oranı Değişim Şoku (%)", -20, 20, 5)
+    simule_kar = 10000000 * (1 + (faiz_soku / 100) - (enflasyon_soku / 100) * 1.5)
+    st.metric("Simüle Edilen Net Teknik Kâr / Zarar", f"{simule_kar:,.0f} TL")
+    st.latex(r"\Delta \text{Kâr} = f(\Delta \text{Faiz}, \Delta \text{Enflasyon})")
+
+def murabaha_hesaplayici():
+    st.subheader("🕌 Murabaha (Maliyet+Kâr Satışı) Hesaplayıcı")
+    st.markdown(
+        '<div class="model-badge">✅ Gerçek katılım bankacılığı ürün formülü — faizsiz finansmanın temel yapısıdır</div>',
+        unsafe_allow_html=True
+    )
+    egitim_notu("""
+**Murabaha nedir?** Faizli kredide banka size doğrudan para (faizle) verir; Murabaha'da ise banka **malın
+kendisini** satıcıdan peşin alır, size (genelde vadeli ve şeffaf bir kâr marjıyla) satar. Fark kritik:
+para değil, mal alınıp satılıyor — bu yüzden "faiz" değil "kâr" olarak adlandırılır ve katılım bankacılığının
+en yaygın finansman yöntemidir (araç, konut, ticari mal finansmanı).
+
+**Formül:** `Satış Bedeli = Mal Bedeli × (1 + Kâr Oranı × Vade/12)`, taksitler bu toplamın vadeye eşit
+bölünmesiyle bulunur (bazı ürünlerde azalan bakiye yöntemi de kullanılır, burada sabit taksit varsayılıyor).
+""")
+    c1, c2 = st.columns(2)
+    with c1:
+        mal_bedeli = st.number_input("Mal/Varlık Bedeli (TL)", 10000, 5000000, 500000, step=10000)
+        kar_orani = st.slider("Yıllık Kâr Oranı (%)", 1.0, 60.0, 35.0)
+    with c2:
+        vade_ay = st.slider("Vade (Ay)", 3, 120, 24)
+    toplam_kar = mal_bedeli * (kar_orani / 100) * (vade_ay / 12)
+    satis_bedeli = mal_bedeli + toplam_kar
+    aylik_taksit = satis_bedeli / vade_ay
+    m1, m2, m3 = st.columns(3)
+    m1.metric("Toplam Kâr Tutarı", f"{toplam_kar:,.0f} TL")
+    m2.metric("Toplam Satış Bedeli", f"{satis_bedeli:,.0f} TL")
+    m3.metric("Aylık Taksit", f"{aylik_taksit:,.0f} TL")
+    if st.button("Murabaha Hesabını Kaydet"):
+        kayit_ekle("Murabaha Hesaplama", f"Mal:{mal_bedeli}, Kâr%:{kar_orani}, Vade:{vade_ay}ay", f"Taksit: {aylik_taksit:,.0f} TL")
+        st.success("Kaydedildi.")
+
+def sukuk_degerleme():
+    st.subheader("🕌 İcara Sukuk Değerleme (Kira Sertifikası)")
+    egitim_notu("""
+**Sukuk nedir?** Tahvilin faizsiz karşılığıdır. Klasik tahvilde yatırımcı borç verir ve faiz alır; İcara
+Sukuk'ta yatırımcı bir varlığın (bina, uçak vb.) **ortak sahibi** olur ve o varlığın kira gelirinden düzenli
+"kira payı" alır — vade sonunda varlık ihraççıya geri satılır (nominal değer ödenir).
+
+**Değerleme mantığı, tahvil fiyatlamasıyla matematiksel olarak aynıdır** (bugünkü değer/present value):
+periyodik kira ödemeleri ve vade sonu nominal değer, beklenen kâr oranıyla iskonto edilip toplanır.
+""")
+    st.latex(r"P = \sum_{t=1}^{n} \frac{\text{Kira Ödemesi}_t}{(1+r)^t} + \frac{\text{Nominal Değer}}{(1+r)^n}")
+    c1, c2 = st.columns(2)
+    with c1:
+        nominal = st.number_input("Nominal Değer (TL)", 1000, 1000000, 100000, step=1000, key="sukuk_nominal")
+        kira_orani = st.slider("Yıllık Kira Getiri Oranı (%)", 1.0, 60.0, 32.0, key="sukuk_kira")
+    with c2:
+        vade_yil = st.slider("Vade (Yıl)", 1, 10, 3, key="sukuk_vade")
+        iskonto_orani = st.slider("Beklenen Piyasa Kâr Oranı (%)", 1.0, 60.0, 34.0, key="sukuk_iskonto",
+                                   help="Piyasadaki benzer risk profilli araçların beklenen getirisi; sukuk'un fiyatını belirler.")
+    yillik_kira = nominal * (kira_orani / 100)
+    pv = sum(yillik_kira / (1 + iskonto_orani / 100) ** t for t in range(1, vade_yil + 1))
+    pv += nominal / (1 + iskonto_orani / 100) ** vade_yil
+    m1, m2 = st.columns(2)
+    m1.metric("Yıllık Kira Ödemesi", f"{yillik_kira:,.0f} TL")
+    m2.metric("Sukuk'un Bugünkü Değeri", f"{pv:,.0f} TL")
+    if pv > nominal:
+        st.info("💡 Bugünkü değer nominalin üzerinde — kira oranı, piyasa beklentisinden yüksek (sukuk primli işlem görür).")
+    elif pv < nominal:
+        st.info("💡 Bugünkü değer nominalin altında — kira oranı, piyasa beklentisinden düşük (sukuk iskontolu işlem görür).")
+
+def katilim_fon_sayfasi():
+    st.header("Katılım Bankacılığı Araçları")
+    t1, t2, t3 = st.tabs(["🕌 Murabaha Hesaplayıcı", "🕌 Sukuk Değerleme", "📊 Fon Performans Karşılaştırma (Demo)"])
+    with t1:
+        murabaha_hesaplayici()
+    with t2:
+        sukuk_degerleme()
+    with t3:
+        demo_rozeti("Fon getirileri rastgele üretilmiştir; gerçek fon verisi değildir.")
+        tarihler = pd.date_range(start='2025-01-01', periods=60, freq='W')
+        rng = np.random.default_rng(42)
+        df_fonlar = pd.DataFrame({
+            'Tarih': tarihler,
+            'Hisse Katılım': 100 * (1 + rng.normal(0.003, 0.02, 60)).cumprod(),
+            'Altın Katılım': 100 * (1 + rng.normal(0.0025, 0.012, 60)).cumprod(),
+            'Sukuk Fonu': 100 * (1 + rng.normal(0.0015, 0.004, 60)).cumprod()
+        })
+        secilenler = st.multiselect("Fonları Seçin", ['Hisse Katılım', 'Altın Katılım', 'Sukuk Fonu'], default=['Hisse Katılım'])
+        if secilenler:
+            st.plotly_chart(px.line(df_fonlar, x='Tarih', y=secilenler, title="Performans Kıyaslaması (Baz: 100 TL, simüle)"), width='stretch')
+
+def alm_nakit_sayfasi():
+    st.header("ALM Nakit Akışı Eşitleme")
+    demo_rozeti()
+    egitim_notu("""
+**ALM (Asset-Liability Management / Varlık-Yükümlülük Yönetimi), bir şirketin varlıklarından gelecek nakit
+akışlarının, yükümlülüklerinden çıkacak nakit akışlarını her dönemde karşılayıp karşılamadığını kontrol eder.**
+Bu, kâr/zarar tablosundan farklı bir bakış açısıdır — şirket kâğıt üzerinde kârlı görünse bile, belirli bir
+yılda elindeki nakit, o yıl ödemesi gereken tazminatı karşılamıyorsa **likidite krizi** yaşar.
+
+**Sigorta şirketleri için özel önemi:** Hayat sigortası ve emeklilik gibi uzun vadeli yükümlülüklerde, varlık
+portföyünün (tahvil, hisse vb.) getiri zamanlaması, yükümlülük ödeme zamanlamasıyla eşleşmelidir. Bu sayfadaki
+kısıt (`Varlık Nakit Akışı ≥ Yükümlülük Nakit Akışı`), her dönem için ayrı ayrı sağlanmalıdır.
+""")
+    yil_1_yuk = st.number_input("1. Yıl Tazminat Yükü (TL)", 1000000, 50000000, 15000000)
+    faiz_orani = st.slider("Piyasa Getirisi (%)", 5, 50, 25)
+    varlik_tahvil = st.number_input("Tahvil Portföyü (TL)", 10000000, 100000000, 60000000)
+    yillar = ['1. Yıl', '2. Yıl', '3. Yıl']
+    yukumlulukler = [yil_1_yuk, yil_1_yuk * 1.2, yil_1_yuk * 1.4]
+    varlik_getirileri = [varlik_tahvil * (faiz_orani / 100)] * 3
+    alm_df = pd.DataFrame({'Yıl': yillar, 'Yükümlülük': yukumlulukler, 'Varlık Getirisi': varlik_getirileri})
+    st.plotly_chart(px.bar(alm_df, x='Yıl', y=['Yükümlülük', 'Varlık Getirisi'], barmode='group'), width='stretch')
+    st.latex(r"CF_{\text{Varlık}, t} \ge CF_{\text{Yükümlülük}, t}")
+
+def alm_durasyon_sayfasi():
+    st.header("ALM Durasyon Eşleştirme Simülatörü")
+    demo_rozeti()
+    egitim_notu("""
+**Durasyon (Macaulay Duration), bir nakit akışı setinin faiz oranı değişimlerine ne kadar duyarlı olduğunu**
+tek bir sayıyla özetler — kabaca, "ağırlıklı ortalama vade" olarak düşünülebilir. Uzun durasyonlu bir varlık/
+yükümlülük, faiz değiştiğinde değeri daha çok değişir.
+
+**Neden önemli?** Bir sigorta şirketinin varlıklarının durasyonu ile yükümlülüklerinin durasyonu birbirinden
+çok farklıysa, faiz oranları değiştiğinde ikisinin değeri **farklı hızda** değişir ve aradaki fark (surplus/
+açık) büyür — buna **durasyon uyumsuzluğu (duration mismatch)** denir. "Durasyon eşleştirme" (immunization)
+stratejisi, bu ikisini birbirine yakın tutarak bilançoyu faiz şoklarına karşı korumayı hedefler; bu sayfa,
+farklı katsayılarla (4.5 vs 6.2) bu duyarlılık farkını gösteriyor.
+""")
+    f_orani = st.slider("Piyasa Faiz Oranı Şoku (%)", -5.0, 5.0, 0.0)
+    v_deger = 100000000 * (1 - 4.5 * (f_orani / 100))
+    y_deger = 90000000 * (1 - 6.2 * (f_orani / 100))
+    st.plotly_chart(px.bar(pd.DataFrame({'Tür': ['Varlık', 'Yükümlülük'], 'Tutar': [v_deger, y_deger]}), x='Tür', y='Tutar', color='Tür'), width="stretch")
+    st.latex(r"D_{Mac} = \frac{\sum_{t=1}^{T} \frac{t \cdot CF_t}{(1+y)^t}}{\sum_{t=1}^{T} \frac{CF_t}{(1+y)^t}}")
+
+def markowitz_sayfasi():
+    st.header("Markowitz Etkin Sınır — Canlı Veriyle Gerçek Portföy Optimizasyonu")
+    st.markdown(
+        '<div class="model-badge">✅ Karesel programlama (SLSQP) ile çözülen gerçek optimizasyon — canlı Yahoo Finance verisi kullanır</div>',
+        unsafe_allow_html=True
+    )
+    egitim_notu("""
+**Bu artık simülasyon değil, gerçek bir kısıtlı optimizasyon problemidir.** Modern Portföy Teorisi'nin (Markowitz,
+1952) temel sorusu: "Belirli bir hedef getiriyi sağlayan, en düşük riskli (varyanslı) hisse ağırlık kombinasyonu
+nedir?"
+
+**Matematiksel yapı:** Portföy varyansı, ağırlıklar (`w`) ve kovaryans matrisi (`Σ`) cinsinden `w^T Σ w`
+şeklinde **karesel (quadratic)** bir fonksiyondur. Bunu, `Σw=1` (ağırlıklar toplamı 1) ve `w·μ=hedef getiri`
+kısıtları altında minimize ediyoruz. Bu tam olarak bir **Karesel Programlama (Quadratic Programming)**
+problemidir; `scipy.optimize.minimize` içindeki **SLSQP** algoritması, KKT (Karush-Kuhn-Tucker) koşullarını
+sayısal olarak çözerek optimal ağırlıkları buluyor.
+
+**Efficient Frontier (Etkin Sınır):** Farklı hedef getiriler için bu optimizasyonu tekrarlayıp risk-getiri
+noktalarını çizdiğimizde ortaya çıkan eğridir — eğrinin altında kalan hiçbir portföy, aynı riskte daha yüksek
+getiri sağlayamaz.
+
+**Sharpe Oranı:** `(Portföy Getirisi − Risksiz Oran) / Portföy Riski` — birim risk başına elde edilen fazla
+getiriyi ölçer; Maksimum Sharpe portföyü, etkin sınır üzerindeki "en verimli" noktadır.
+""")
+
+    etiketler = [f"{ad} ({sembol})" for sembol, ad in BIST_POPULER]
+    secilen_etiketler = st.multiselect("Optimize Edilecek Hisseler (en az 3 seçin)", etiketler, default=etiketler[:5])
+    hisse_listesi = [BIST_POPULER[etiketler.index(e)][0] for e in secilen_etiketler]
+    risksiz_oran = st.slider("Risksiz Faiz Oranı Varsayımı (%)", 5, 60, 30,
+                              help="Sharpe oranı hesaplaması için kullanılır; Türkiye'de genelde TCMB politika faizi baz alınır.") / 100
+
+    if len(hisse_listesi) >= 3 and st.button("Etkin Sınırı Hesapla"):
+        with st.spinner("Canlı veri çekiliyor ve optimizasyon çözülüyor..."):
+            ort_getiri, kovaryans = markowitz_veri_getir(hisse_listesi)
+            if len(ort_getiri) < 3:
+                st.error("Yeterli veri çekilemedi, farklı hisseler deneyin.")
+            else:
+                hedef_araligi = np.linspace(ort_getiri.min(), ort_getiri.max() * 0.98, 30)
+                sonuclar = []
+                for hg in hedef_araligi:
+                    w = min_varyans_agirliklari(kovaryans, hg, ort_getiri.values)
+                    if w is not None:
+                        risk = np.sqrt(w @ kovaryans.values @ w)
+                        sonuclar.append((risk, hg))
+                if sonuclar:
+                    riskler, getiriler_egri = zip(*sonuclar)
+                    fig = go.Figure()
+                    fig.add_trace(go.Scatter(x=list(riskler), y=list(getiriler_egri), mode='lines+markers',
+                                              name='Etkin Sınır', line=dict(color='#0055a5')))
+
+                    w_sharpe = maksimum_sharpe_agirliklari(kovaryans, ort_getiri.values, risksiz_oran)
+                    if w_sharpe is not None:
+                        r_sh = np.dot(w_sharpe, ort_getiri.values)
+                        risk_sh = np.sqrt(w_sharpe @ kovaryans.values @ w_sharpe)
+                        fig.add_trace(go.Scatter(x=[risk_sh], y=[r_sh], mode='markers',
+                                                  marker=dict(color='red', size=14, symbol='star'),
+                                                  name='Maksimum Sharpe Portföyü'))
+                    fig.update_layout(title="Etkin Sınır (Yıllıklandırılmış Risk vs Getiri)",
+                                       xaxis_title="Risk (Std. Sapma)", yaxis_title="Beklenen Getiri")
+                    st.plotly_chart(fig, width='stretch')
+
+                    if w_sharpe is not None:
+                        st.subheader("⭐ Maksimum Sharpe Portföyü Ağırlıkları")
+                        agirlik_df = pd.DataFrame({'Hisse': hisse_listesi, 'Ağırlık (%)': (w_sharpe * 100).round(2)})
+                        agirlik_df = agirlik_df[agirlik_df['Ağırlık (%)'] > 0.1].sort_values('Ağırlık (%)', ascending=False)
+                        st.dataframe(agirlik_df, width='stretch', hide_index=True)
+                        c1, c2 = st.columns(2)
+                        c1.metric("Beklenen Yıllık Getiri", f"%{r_sh * 100:.1f}")
+                        c2.metric("Beklenen Yıllık Risk", f"%{risk_sh * 100:.1f}")
+                        kayit_ekle("Markowitz Optimizasyonu", f"{len(hisse_listesi)} hisse", f"Sharpe getiri: %{r_sh*100:.1f}")
+                else:
+                    st.warning("Optimizasyon bu hisse kombinasyonu için çözüm bulamadı.")
+    st.latex(r"\min_w\ w^T \Sigma w \quad \text{s.t.} \quad \sum w_i = 1,\ \ w^T \mu = \text{hedef getiri},\ \ w_i \ge 0")
+
+def varlik_dagilimi_sayfasi():
+    st.header("Varlık Dağılım Simülatörü")
+    demo_rozeti("Elle girilen ağırlıkları görselleştirir; Markowitz sayfasındaki gibi optimize etmez.")
+    egitim_notu("""
+**Bu sayfa bir optimizasyon değil, "ne görürsün" görselleştirmesidir** — Kantitatif Finans segmentindeki
+Markowitz sayfası, ağırlıkları matematiksel olarak optimize ederken, burada kullanıcı ağırlıkları elle girip
+sonucu görür.
+
+**Neden varlık dağılımı önemli?** Akademik çalışmalar (Brinson vd.), bir portföyün uzun vadeli getiri
+değişkenliğinin büyük kısmının, hangi hisseyi seçtiğinizden çok, **hangi varlık sınıflarına ne oranda
+yatırım yaptığınızdan** (asset allocation) kaynaklandığını gösterir. Bu yüzden kurumsal portföy yönetiminde
+"hangi hisse" sorusundan önce "hisse/tahvil/altın dengesi ne olmalı" sorusu sorulur.
+""")
+    w_hisse = st.slider("Hisse (%)", 0, 100, 50)
+    w_tahvil = st.slider("Tahvil (%)", 0, 100, 30)
+    w_altin = st.slider("Altın (%)", 0, 100, 20)
+    if w_hisse + w_tahvil + w_altin == 100:
+        st.plotly_chart(px.pie(names=['Hisse', 'Tahvil', 'Altın'], values=[w_hisse, w_tahvil, w_altin], hole=0.4), width='stretch')
+    else:
+        st.warning("⚠️ Toplam %100 olmalıdır!")
+
+def benchmark_sayfasi():
+    st.header("Piyasa Kıyaslama (Benchmark)")
+    demo_rozeti()
+    egitim_notu("""
+**Nominal getiri ile reel (enflasyondan arındırılmış) getiriyi karıştırmak, finansta en sık yapılan hatalardan
+biridir.** "%35 kazandım" cümlesi, enflasyon %40 ise aslında bir kayıptır. Formüldeki `Reel Getiri` hesabı
+tam olarak bunu düzeltir — nominal getiriyi enflasyon oranına bölerek "gerçek satın alma gücü" cinsinden
+getiriyi bulur (basit çıkarma — `Nominal − Enflasyon` — yüksek enflasyon dönemlerinde yanıltıcı olduğu için
+tercih edilmez).
+
+**Benchmark'ın (kıyaslama endeksinin) rolü:** Bir portföy yöneticisinin "başarılı" olup olmadığı, mutlak
+getiriyle değil, ilgili piyasa endeksine (örn. BIST 100) veya enflasyona göre **relatif performansla**
+değerlendirilir — bu, fon yönetimi endüstrisinde standart bir KPI'dır.
+""")
+    portfoy_getiri = st.slider("Yıllık Getiri (%)", 0, 100, 35)
+    enflasyon = st.slider("Enflasyon (%)", 0, 80, 25)
+    st.plotly_chart(px.bar(pd.DataFrame({'Endeks': ['Portföy', 'BIST 100', 'Enflasyon'], 'Getiri (%)': [portfoy_getiri, 28.5, enflasyon]}),
+                            x='Endeks', y='Getiri (%)', color='Endeks'), width='stretch')
+    st.latex(r"R_{reel} = \frac{1 + R_{nominal}}{1 + R_{enflasyon}} - 1")
+
+def telematik_sayfasi():
+    st.header("Telematik Tabanlı Risk Skorlama")
+    demo_rozeti("Elle belirlenmiş ağırlıklarla kurulmuş bir skor formülüdür; eğitilmiş bir ML modeli değildir.")
+    egitim_notu("""
+**Telematik (Usage-Based Insurance / UBI), sigortayı "kim olduğun"dan (yaş, cinsiyet, meslek) "nasıl
+davrandığın"a kaydıran bir yaklaşımdır** — araca takılan bir cihaz veya mobil uygulama, ani fren, gece
+sürüşü, hız gibi gerçek sürüş verisini toplar.
+
+**Neden önemli?** Geleneksel fiyatlama (bu sitede Kasko GLM sayfasındaki gibi) demografik/araç özelliklerine
+dayanır ve **korelasyona** dayalıdır ("genç sürücüler istatistiksel olarak daha riskli"); telematik ise
+**doğrudan davranışı** ölçer, bu yüzden daha adil ve daha az riskli sürücüyü doğru fiyatlandırma potansiyeli
+sunar. Bu sayfadaki formül basit bir ağırlıklı skorlama; üretim sistemlerinde genelde bu ham sinyaller,
+Kasko GLM'deki gibi bir GLM'e ek değişken olarak beslenir (telematik skoru → prim çarpanı).
+""")
+    ani_fren = st.slider("Ani Fren (adet/ay)", 0, 50, 12)
+    gece_suruş = st.slider("Gece Sürüşü (%)", 0, 100, 45)
+    skor = max(0, 100 - (ani_fren * 1.5) - (gece_suruş * 0.5))
+    st.metric("Güvenli Sürüş Skoru", f"{skor}")
+    st.latex(r"\text{Sürüş Skoru} = 100 - \left(\sum_{i=1}^{n} w_i \cdot X_i\right)")
+
+def clv_sayfasi():
+    st.header("Müşteri Yaşam Boyu Değeri (CLV)")
+    demo_rozeti()
+    egitim_notu("""
+**CLV (Customer Lifetime Value), bir müşterinin şirketle olan ilişkisi boyunca yaratacağı toplam kârın bugünkü
+tahminidir** — pazarlama ve müşteri ilişkileri kararlarının temel finansal ölçütlerinden biridir.
+
+**Neden önemli?** Bir müşteriyi kazanmanın maliyeti (CAC — Customer Acquisition Cost) ile CLV karşılaştırılır:
+CLV, CAC'den anlamlı ölçüde yüksekse o kanal/segment kârlıdır. Bu formül basitleştirilmiş; gerçek CLV
+modellerinde genelde müşteri elde tutma olasılığı (survival/churn olasılığı — bu sitedeki Churn modülüyle
+doğrudan bağlantılı) ve zaman değeri (iskonto) de hesaba katılır, yani CLV ve Churn modelleri üretimde
+genelde birlikte çalışır.
+""")
+    police_tutari = st.number_input("Poliçe Tutarı", value=4500.0)
+    islem_sayisi = st.slider("Yıllık İşlem Sayısı", 1, 12, 2)
+    omur = st.slider("Beklenen Müşteri Ömrü (Yıl)", 1, 20, 5)
+    marj = st.slider("Kâr Marjı (%)", 5, 50, 20) / 100
+    clv_deger = police_tutari * islem_sayisi * omur * marj
+    st.metric("Ortalama CLV", f"{clv_deger:,.2f} TL")
+    st.latex(r"CLV = (\text{Ort. Harcama} \times \text{Frekans} \times \text{Ömür}) \times \text{Marj}")
+
+# ---------------------------------------------------------
+# SİSTEM & İLETİŞİM
+# ---------------------------------------------------------
+def veritabani_sayfasi():
+    st.header("SQLite Veritabanı Geçmişi")
+    st.info("Not: Streamlit Cloud gibi ephemeral (geçici) barındırmalarda bu veritabanı her yeniden dağıtımda sıfırlanır.")
+    st.dataframe(gecmisi_getir(), width='stretch')
+
+def hakkinda_sayfasi():
+    st.header("Proje Sahibi & Portfolyo Vitrini")
+    col1, col2 = st.columns([1, 3])
+    with col1:
+        st.image("https://cdn-icons-png.flaticon.com/512/3135/3135715.png", width=180)
+    with col2:
+        st.markdown("""
+        Merhaba! Ben **Sultan Kuş**.
+        Matematik altyapımla finans, sigorta ve risk analitiği alanlarına yönelik veri bilimi çözümleri geliştiriyorum.
+        Hedefim; finans, sigorta ve **katılım bankacılığı** alanlarında, matematiksel titizliği veri bilimiyle
+        birleştiren bir rol.
+
+        * **📧 Email:** [kussultannn34@gmail.com](mailto:kussultannn34@gmail.com)
+        * **💼 LinkedIn:** [linkedin.com/in/sultan-kuş](https://www.linkedin.com/in/sultan-kuş/)
+        * **💻 GitHub:** [github.com/SultanKus](https://github.com/SultanKus)
+        """)
+    st.markdown("---")
+    st.subheader("🎯 Yetkinlik Haritası")
+    st.markdown("""
+| Alan | Yetkinlikler |
+|---|---|
+| **Matematik & İstatistik** | Olasılık Teorisi, Stokastik Süreçler, Doğrusal Cebir, Optimizasyon (Karesel Programlama), İstatistiksel Modelleme |
+| **Aktüerya & Risk** | IBNR (Chain Ladder), Solvency II, VaR, Poisson/GLM Frekans Modelleme, Aktüerlik Sınavına Hazırlık |
+| **Finansal Mühendislik** | Black-Scholes, Markowitz Portföy Optimizasyonu, Reasürans, Katılım Bankacılığı Ürünleri (Murabaha, Sukuk) |
+| **Makine Öğrenmesi** | Lojistik Regresyon, Poisson Regresyonu, Model Doğrulama (AUC, F1), Scikit-learn |
+| **Yazılım & Araçlar** | Python, SQL, Streamlit, Plotly, Git/GitHub, Excel (İleri Düzey), SAP |
+""")
+    st.caption("Bu tablo, proje boyunca fiilen uygulanan yöntemlere dayanır — her satır, sitedeki ilgili modülle doğrulanabilir.")
+    st.markdown("---")
+    st.subheader("📄 Özgeçmiş (CV)")
+    try:
+        with open("Sultan_Kus_CV.pdf", "rb") as pdf_file:
+            st.download_button(label="Özgeçmişimi İndir (PDF)", data=pdf_file, file_name="Sultan_Kus_CV.pdf", mime="application/pdf")
+    except FileNotFoundError:
+        st.warning("⚠️ 'Sultan_Kus_CV.pdf' dosyası proje klasöründe bulunamadı.")
+
+# ---------------------------------------------------------
+# NAVİGASYON
+# ---------------------------------------------------------
+pg = st.navigation({
+    "Genel Bakış & Canlı Piyasa": [
+        st.Page(ana_sayfa, title="Ana Sayfa", icon="🏠"),
+        st.Page(ml_rehberi_sayfasi, title="ML & Aktüerya Rehberi", icon="🎓"),
+        st.Page(finansal_bilgi_sayfasi, title="Makroekonomi & Piyasalar", icon="🌍"),
+        st.Page(veri_analizi_sayfasi, title="Canlı Hisse Korelasyon (EDA)", icon="📈"),
+    ],
+    "✅ Doğrulanmış ML Modelleri": [
+        st.Page(kasko_fiyatlama_sayfasi, title="Kasko Saf Prim (Poisson GLM)", icon="🚗"),
+        st.Page(kredi_risk_sayfasi, title="Kredi Risk Skorlama", icon="🏦"),
+        st.Page(churn_sayfasi, title="Churn Tahmini", icon="🚪"),
+        st.Page(fraud_sayfasi, title="Fraud Uyarı Sistemi", icon="🕵️"),
+    ],
+    "📊 Kantitatif Finans (Canlı Optimizasyon)": [
+        st.Page(markowitz_sayfasi, title="Markowitz Portföy Optimizasyonu", icon="🥧"),
+    ],
+    "🕌 Katılım Bankacılığı": [
+        st.Page(katilim_fon_sayfasi, title="Murabaha & Sukuk Araçları", icon="🕌"),
+    ],
+    "📐 Aktüeryal Yöntemler": [
+        st.Page(ibnr_sayfasi, title="IBNR Muallak Hasar", icon="📐"),
+        st.Page(hayat_sigortasi_sayfasi, title="Hayat Sigortası Fiyatlama", icon="👨‍🦳"),
+        st.Page(hasar_frekans_sayfasi, title="Hasar Frekans & Risk", icon="📉"),
+        st.Page(monte_carlo_sayfasi, title="Monte Carlo Simülatörü", icon="🎲"),
+        st.Page(solvency_sayfasi, title="Solvency II", icon="🏛️"),
+        st.Page(black_scholes_sayfasi, title="Black-Scholes", icon="📈"),
+        st.Page(kredi_var_sayfasi, title="Kredi Portföyü VaR", icon="📉"),
+        st.Page(reasurans_sayfasi, title="Dinamik Reasürans", icon="🌐"),
+    ],
+    "🧪 Kavramsal Vitrin (Demo)": [
+        st.Page(stres_testi_sayfasi, title="Aktüeryal Stres Testi", icon="⚡"),
+        st.Page(alm_nakit_sayfasi, title="ALM Nakit Eşitleme", icon="🔄"),
+        st.Page(alm_durasyon_sayfasi, title="ALM Durasyon", icon="⚖️"),
+        st.Page(varlik_dagilimi_sayfasi, title="Varlık Dağılımı", icon="📊"),
+        st.Page(benchmark_sayfasi, title="Piyasa Kıyaslama", icon="📈"),
+        st.Page(telematik_sayfasi, title="Telematik Risk Skorlama", icon="🚗"),
+        st.Page(clv_sayfasi, title="Müşteri Yaşam Değeri", icon="💎"),
+    ],
+    "Sistem & İletişim": [
+        st.Page(veritabani_sayfasi, title="Veritabanı Geçmişi", icon="📂"),
+        st.Page(hakkinda_sayfasi, title="Hakkımda & İletişim", icon="👩‍💻"),
+    ]
+})
+
+pg.run()
