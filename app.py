@@ -493,6 +493,51 @@ def inv_tablo_goster(basliklar, satirlar_html):
         unsafe_allow_html=True
     )
 
+def piyasa_karti(sutun, enstruman, seri, gun_sayisi):
+    """Değer + yüzde rozeti + mini sparkline gösteren tek bir piyasa kartı (Makroekonomi sayfası için)."""
+    seri = seri.dropna()
+    with sutun:
+        if len(seri) < 2:
+            st.markdown(
+                f'<div class="piyasa-karti"><div class="pk-ad">{enstruman["ad"]}</div>'
+                f'<div class="pk-deger">—</div>'
+                f'<div class="pk-alt">Veri alınamadı</div></div>',
+                unsafe_allow_html=True
+            )
+            return
+
+        dilim = seri.iloc[-(gun_sayisi + 1):] if len(seri) > gun_sayisi else seri
+        son = dilim.iloc[-1]
+        degisim = (son / dilim.iloc[0] - 1) * 100 if dilim.iloc[0] else 0.0
+        artis = degisim >= 0
+        renk = "#1e6b34" if artis else "#b3261e"
+        arka = "rgba(30,107,52,0.10)" if artis else "rgba(179,38,30,0.10)"
+        ok = "▲" if artis else "▼"
+
+        st.markdown(f"""
+        <div class="piyasa-karti" style="border-left: 4px solid {renk};">
+            <div class="pk-ad">{enstruman['ad']}</div>
+            <div class="pk-deger">{enstruman['birim']}{tr_sayi(son, enstruman['ondalik'])}</div>
+            <div class="pk-rozet" style="color:{renk}; background:{arka};">
+                {ok} %{tr_sayi(abs(degisim), 2)}
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        fig = go.Figure(go.Scatter(
+            x=dilim.index, y=dilim.values, mode="lines",
+            line=dict(color=renk, width=2),
+            fill="tozeroy", fillcolor=arka,
+            hovertemplate="%{x|%d.%m.%Y}<br>%{y:,.2f}<extra></extra>"
+        ))
+        fig.update_layout(
+            height=70, margin=dict(l=0, r=0, t=0, b=0),
+            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+            xaxis=dict(visible=False), yaxis=dict(visible=False, range=[dilim.min() * 0.995, dilim.max() * 1.005]),
+            showlegend=False
+        )
+        st.plotly_chart(fig, config={"displayModeBar": False}, width="stretch")
+
 # ---------------------------------------------------------
 # GENEL BAKIŞ & CANLI PİYASA SAYFALARI
 # ---------------------------------------------------------
@@ -615,7 +660,18 @@ def ana_sayfa():
     """)
 
 def finansal_bilgi_sayfasi():
-    st.markdown(INV_CSS, unsafe_allow_html=True)
+    st.markdown("""
+    <style>
+    .piyasa-karti { background:#ffffff; border-radius:10px; padding:14px 16px 6px 16px;
+                    box-shadow:0 2px 6px rgba(0,0,0,0.06); margin-bottom:-10px; }
+    .pk-ad     { font-size:0.80rem; text-transform:uppercase; letter-spacing:0.6px;
+                 color:#5a6b7b !important; font-weight:600; }
+    .pk-deger  { font-size:1.65rem; font-weight:700; color:#0b1f33 !important; line-height:1.4; }
+    .pk-rozet  { display:inline-block; padding:2px 8px; border-radius:6px;
+                 font-size:0.82rem; font-weight:700; }
+    .pk-alt    { font-size:0.85rem; color:#8a97a3 !important; }
+    </style>
+    """, unsafe_allow_html=True)
 
     st.header("🌍 Canlı Makroekonomi & Küresel Piyasalar")
     st.markdown(
@@ -659,47 +715,12 @@ daha anlamlıdır.
     son_tarih = pano.index[-1].strftime("%d.%m.%Y")
     st.caption(f"Son veri tarihi: {son_tarih} · Kaynak: Yahoo Finance")
 
+    # --- Kart paneli (2 satır × 4 sütun) ---
     mevcut = [e for e in PANO_ENSTRUMANLARI if e["kod"] in pano.columns]
-
-    # --- Akan piyasa şeridi (günlük değişim) ---
-    ticker_satirlari = []
-    for e in mevcut:
-        seri = pano[e["kod"]].dropna()
-        gunluk = _degisim_yuzde(seri, 1)
-        if len(seri) >= 1 and gunluk is not None:
-            ticker_satirlari.append((e["ad"], seri.iloc[-1], gunluk, e["birim"], e["ondalik"]))
-    if ticker_satirlari:
-        inv_ticker_goster(ticker_satirlari)
-
-    # --- Yoğun genel bakış tablosu (seçilen periyoda göre) ---
-    st.subheader("📋 Piyasa Özeti")
-    satirlar_html = []
-    for e in mevcut:
-        seri = pano[e["kod"]].dropna()
-        if len(seri) < 2:
-            continue
-        dilim = seri.iloc[-(gun_sayisi + 1):] if len(seri) > gun_sayisi else seri
-        son, ilk = dilim.iloc[-1], dilim.iloc[0]
-        degisim_mutlak = son - ilk
-        degisim_yuzde = (son / ilk - 1) * 100 if ilk else 0.0
-        yuksek, dusuk = dilim.max(), dilim.min()
-        pos = degisim_yuzde >= 0
-        klas = "inv-pos" if pos else "inv-neg"
-        rozet = "inv-badge-pos" if pos else "inv-badge-neg"
-        ok = "▲" if pos else "▼"
-        satirlar_html.append(f"""
-        <tr>
-            <td class="inv-name-cell">{e['ad']}</td>
-            <td>{e['birim']}{tr_sayi(son, e['ondalik'])}</td>
-            <td class="{klas}">{'+' if pos else ''}{tr_sayi(degisim_mutlak, e['ondalik'])}</td>
-            <td><span class="{rozet}">{ok} %{tr_sayi(abs(degisim_yuzde), 2)}</span></td>
-            <td>{e['birim']}{tr_sayi(yuksek, e['ondalik'])}</td>
-            <td>{e['birim']}{tr_sayi(dusuk, e['ondalik'])}</td>
-        </tr>""")
-    inv_tablo_goster(
-        ["Enstrüman", "Son", "Değişim", "Değişim %", f"{periyot_etiket} Yüksek", f"{periyot_etiket} Düşük"],
-        satirlar_html
-    )
+    for satir_baslangic in range(0, len(mevcut), 4):
+        sutunlar = st.columns(4)
+        for sutun, enstruman in zip(sutunlar, mevcut[satir_baslangic:satir_baslangic + 4]):
+            piyasa_karti(sutun, enstruman, pano[enstruman["kod"]], gun_sayisi)
 
     st.markdown("---")
 
