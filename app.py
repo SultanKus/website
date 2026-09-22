@@ -436,6 +436,12 @@ BIST_POPULER = [
     ("ENJSA.IS", "Enerjisa"), ("PETKM.IS", "Petkim"), ("ALARK.IS", "Alarko Holding"),
     ("TTKOM.IS", "Türk Telekom"), ("CCOLA.IS", "Coca-Cola İçecek"), ("ULKER.IS", "Ülker"),
     ("DOAS.IS", "Doğuş Otomotiv"), ("VESTL.IS", "Vestel"), ("GUBRF.IS", "Gübre Fabrikaları"),
+    ("SAHOL.IS", "Sabancı Holding"), ("ANSGR.IS", "Anadolu Sigorta"), ("TURSG.IS", "Türkiye Sigorta"),
+    ("AGESA.IS", "Agesa Hayat ve Emeklilik"), ("EKGYO.IS", "Emlak Konut GYO"), ("TKFEN.IS", "Tekfen Holding"),
+    ("ISGYO.IS", "İş GYO"), ("KRDMD.IS", "Kardemir (D)"), ("SOKM.IS", "Şok Marketler"),
+    ("AEFES.IS", "Anadolu Efes"), ("MPARK.IS", "MLP Sağlık"), ("LOGO.IS", "Logo Yazılım"),
+    ("KARSN.IS", "Karsan Otomotiv"), ("OTKAR.IS", "Otokar"), ("CIMSA.IS", "Çimsa"),
+    ("OYAKC.IS", "OYAK Çimento"), ("KLKIM.IS", "Kalekim"), ("KONTR.IS", "Kontrolmatik"),
 ]
 
 
@@ -446,24 +452,32 @@ BIST_SEKTORU = {
     "ISCTR.IS": "Bankacılık", "HALKB.IS": "Bankacılık", "VAKBN.IS": "Bankacılık",
     "KCHOL.IS": "Holding & Sanayi", "SASA.IS": "Holding & Sanayi", "EREGL.IS": "Holding & Sanayi",
     "SISE.IS": "Holding & Sanayi", "ALARK.IS": "Holding & Sanayi", "HEKTS.IS": "Holding & Sanayi",
-    "GUBRF.IS": "Holding & Sanayi",
+    "GUBRF.IS": "Holding & Sanayi", "SAHOL.IS": "Holding & Sanayi", "TKFEN.IS": "Holding & Sanayi",
+    "KRDMD.IS": "Holding & Sanayi", "CIMSA.IS": "Holding & Sanayi", "OYAKC.IS": "Holding & Sanayi",
+    "KLKIM.IS": "Holding & Sanayi", "KONTR.IS": "Holding & Sanayi",
     "FROTO.IS": "Otomotiv", "TOASO.IS": "Otomotiv", "DOAS.IS": "Otomotiv",
-    "BIMAS.IS": "Perakende & Gıda", "MGROS.IS": "Perakende & Gıda",
-    "CCOLA.IS": "Perakende & Gıda", "ULKER.IS": "Perakende & Gıda",
+    "KARSN.IS": "Otomotiv", "OTKAR.IS": "Otomotiv",
+    "BIMAS.IS": "Perakende & Gıda", "MGROS.IS": "Perakende & Gıda", "CCOLA.IS": "Perakende & Gıda",
+    "ULKER.IS": "Perakende & Gıda", "SOKM.IS": "Perakende & Gıda", "AEFES.IS": "Perakende & Gıda",
     "ASELS.IS": "Teknoloji & Telekom", "TCELL.IS": "Teknoloji & Telekom", "TTKOM.IS": "Teknoloji & Telekom",
+    "LOGO.IS": "Teknoloji & Telekom",
     "TUPRS.IS": "Enerji & Madencilik", "ENJSA.IS": "Enerji & Madencilik",
     "KOZAL.IS": "Enerji & Madencilik", "KOZAA.IS": "Enerji & Madencilik", "PETKM.IS": "Enerji & Madencilik",
     "ARCLK.IS": "Dayanıklı Tüketim", "VESTL.IS": "Dayanıklı Tüketim",
+    "ANSGR.IS": "Sigorta", "TURSG.IS": "Sigorta", "AGESA.IS": "Sigorta",
+    "EKGYO.IS": "İnşaat & GYO", "ISGYO.IS": "İnşaat & GYO",
+    "MPARK.IS": "Sağlık",
 }
 
 SEKTOR_SIRASI = [
     "Bankacılık", "Holding & Sanayi", "Havacılık & Ulaştırma", "Otomotiv",
-    "Perakende & Gıda", "Teknoloji & Telekom", "Enerji & Madencilik", "Dayanıklı Tüketim", "Diğer",
+    "Perakende & Gıda", "Teknoloji & Telekom", "Enerji & Madencilik",
+    "Dayanıklı Tüketim", "Sigorta", "İnşaat & GYO", "Sağlık", "Diğer",
 ]
 
 
 def hisse_secim_paneli(key_prefix, varsayilan_semboller):
-    """Sektöre göre gruplanmış, açılır kutucuklu (checkbox) hisse seçim paneli.
+    """Sektöre göre gruplanmış, aranabilir, açılır kutucuklu (checkbox) hisse seçim paneli.
     Investing.com/TradingView'daki 'watchlist oluştur' deneyimine benzer;
     kırmızı/mavi renk sorununa yol açan multiselect etiketleri yerine geçer."""
     ad_sozlugu = dict(BIST_POPULER)
@@ -472,19 +486,36 @@ def hisse_secim_paneli(key_prefix, varsayilan_semboller):
         sektor = BIST_SEKTORU.get(sembol, "Diğer")
         sektorler.setdefault(sektor, []).append((sembol, ad))
 
-    secili = []
+    ust1, ust2 = st.columns([4, 1])
+    with ust1:
+        arama = st.text_input("🔍 Hisse veya sektör ara", value="", key=f"{key_prefix}_ara",
+                              placeholder="örn. banka, ASELS, tüpraş, otomotiv")
+    with ust2:
+        st.markdown('<div style="height:1.65rem;"></div>', unsafe_allow_html=True)
+        if st.button("Temizle", key=f"{key_prefix}_temizle", width="stretch"):
+            for sembol, _ in BIST_POPULER:
+                st.session_state[f"{key_prefix}_chk_{sembol}"] = False
+            st.rerun()
+
+    arama_l = arama.strip().lower()
+
     sira = [s for s in SEKTOR_SIRASI if s in sektorler] + [s for s in sektorler if s not in SEKTOR_SIRASI]
     for sektor in sira:
         hisseler_bu_sektor = sektorler[sektor]
-        varsayilan_sayisi = sum(1 for s, _ in hisseler_bu_sektor if s in varsayilan_semboller)
-        with st.expander(f"{sektor}  ·  {len(hisseler_bu_sektor)} hisse", expanded=(varsayilan_sayisi > 0)):
+        if arama_l and arama_l not in sektor.lower():
+            hisseler_bu_sektor = [(s, a) for s, a in hisseler_bu_sektor
+                                  if arama_l in a.lower() or arama_l in s.lower()]
+        if arama_l and not hisseler_bu_sektor:
+            continue
+        with st.expander(f"{sektor}  ·  {len(hisseler_bu_sektor)} hisse", expanded=bool(arama_l)):
             kolonlar = st.columns(3)
             for i, (sembol, ad) in enumerate(hisseler_bu_sektor):
                 with kolonlar[i % 3]:
-                    isaretli = st.checkbox(ad, value=(sembol in varsayilan_semboller),
-                                           key=f"{key_prefix}_chk_{sembol}")
-                    if isaretli:
-                        secili.append(sembol)
+                    st.checkbox(ad, value=(sembol in varsayilan_semboller), key=f"{key_prefix}_chk_{sembol}")
+
+    # Görünürde olmasa bile (arama filtreliyken) tüm işaretli hisseleri topla
+    secili = [sembol for sembol, _ in BIST_POPULER
+              if st.session_state.get(f"{key_prefix}_chk_{sembol}", sembol in varsayilan_semboller)]
 
     if secili:
         pilller = "".join(
