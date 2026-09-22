@@ -44,7 +44,7 @@ div.stMetric { background-color: #ffffff; padding: 15px; border-radius: 8px; box
 .model-badge { background-color: #e6f4ea; color: #1e6b34; padding: 6px 12px; border-radius: 6px; font-size: 0.85rem; display: inline-block; margin-bottom: 10px; }
 .demo-badge { background-color: #fff4e5; color: #8a5a00; padding: 6px 12px; border-radius: 6px; font-size: 0.85rem; display: inline-block; margin-bottom: 10px; }
 
-.stMultiSelect span[data-baseweb="tag"] {
+.stMultiSelect [data-baseweb="tag"] {
     background-color: #0055a5 !important;
     border-radius: 20px !important;
     padding: 3px 6px 3px 12px !important;
@@ -54,10 +54,11 @@ div.stMetric { background-color: #ffffff; padding: 15px; border-radius: 8px; box
     box-shadow: 0 1px 3px rgba(0,85,165,0.25);
     transition: background-color 0.15s ease;
 }
-.stMultiSelect span[data-baseweb="tag"]:hover { background-color: #003d73 !important; }
-.stMultiSelect span[data-baseweb="tag"] span { color: #ffffff !important; }
-.stMultiSelect span[data-baseweb="tag"] svg { fill: #ffffff !important; opacity: 0.8; }
-.stMultiSelect span[data-baseweb="tag"] svg:hover { opacity: 1; }
+.stMultiSelect [data-baseweb="tag"]:hover { background-color: #003d73 !important; }
+.stMultiSelect [data-baseweb="tag"] span,
+.stMultiSelect [data-baseweb="tag"] * { color: #ffffff !important; }
+.stMultiSelect [data-baseweb="tag"] svg { fill: #ffffff !important; opacity: 0.8; }
+.stMultiSelect [data-baseweb="tag"] svg:hover { opacity: 1; }
 .stMultiSelect > div > div,
 .stSelectbox > div > div {
     border-radius: 8px !important;
