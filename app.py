@@ -440,6 +440,70 @@ BIST_POPULER = [
 
 
 
+BIST_SEKTORU = {
+    "THYAO.IS": "Havacılık & Ulaştırma", "PGSUS.IS": "Havacılık & Ulaştırma", "TAVHL.IS": "Havacılık & Ulaştırma",
+    "AKBNK.IS": "Bankacılık", "GARAN.IS": "Bankacılık", "YKBNK.IS": "Bankacılık",
+    "ISCTR.IS": "Bankacılık", "HALKB.IS": "Bankacılık", "VAKBN.IS": "Bankacılık",
+    "KCHOL.IS": "Holding & Sanayi", "SASA.IS": "Holding & Sanayi", "EREGL.IS": "Holding & Sanayi",
+    "SISE.IS": "Holding & Sanayi", "ALARK.IS": "Holding & Sanayi", "HEKTS.IS": "Holding & Sanayi",
+    "GUBRF.IS": "Holding & Sanayi",
+    "FROTO.IS": "Otomotiv", "TOASO.IS": "Otomotiv", "DOAS.IS": "Otomotiv",
+    "BIMAS.IS": "Perakende & Gıda", "MGROS.IS": "Perakende & Gıda",
+    "CCOLA.IS": "Perakende & Gıda", "ULKER.IS": "Perakende & Gıda",
+    "ASELS.IS": "Teknoloji & Telekom", "TCELL.IS": "Teknoloji & Telekom", "TTKOM.IS": "Teknoloji & Telekom",
+    "TUPRS.IS": "Enerji & Madencilik", "ENJSA.IS": "Enerji & Madencilik",
+    "KOZAL.IS": "Enerji & Madencilik", "KOZAA.IS": "Enerji & Madencilik", "PETKM.IS": "Enerji & Madencilik",
+    "ARCLK.IS": "Dayanıklı Tüketim", "VESTL.IS": "Dayanıklı Tüketim",
+}
+
+SEKTOR_SIRASI = [
+    "Bankacılık", "Holding & Sanayi", "Havacılık & Ulaştırma", "Otomotiv",
+    "Perakende & Gıda", "Teknoloji & Telekom", "Enerji & Madencilik", "Dayanıklı Tüketim", "Diğer",
+]
+
+
+def hisse_secim_paneli(key_prefix, varsayilan_semboller):
+    """Sektöre göre gruplanmış, açılır kutucuklu (checkbox) hisse seçim paneli.
+    Investing.com/TradingView'daki 'watchlist oluştur' deneyimine benzer;
+    kırmızı/mavi renk sorununa yol açan multiselect etiketleri yerine geçer."""
+    ad_sozlugu = dict(BIST_POPULER)
+    sektorler = {}
+    for sembol, ad in BIST_POPULER:
+        sektor = BIST_SEKTORU.get(sembol, "Diğer")
+        sektorler.setdefault(sektor, []).append((sembol, ad))
+
+    secili = []
+    sira = [s for s in SEKTOR_SIRASI if s in sektorler] + [s for s in sektorler if s not in SEKTOR_SIRASI]
+    for sektor in sira:
+        hisseler_bu_sektor = sektorler[sektor]
+        varsayilan_sayisi = sum(1 for s, _ in hisseler_bu_sektor if s in varsayilan_semboller)
+        with st.expander(f"{sektor}  ·  {len(hisseler_bu_sektor)} hisse", expanded=(varsayilan_sayisi > 0)):
+            kolonlar = st.columns(3)
+            for i, (sembol, ad) in enumerate(hisseler_bu_sektor):
+                with kolonlar[i % 3]:
+                    isaretli = st.checkbox(ad, value=(sembol in varsayilan_semboller),
+                                           key=f"{key_prefix}_chk_{sembol}")
+                    if isaretli:
+                        secili.append(sembol)
+
+    if secili:
+        pilller = "".join(
+            f'<span style="display:inline-block; background:#0055a5; color:#fff !important; '
+            f'padding:4px 13px; border-radius:14px; font-size:0.82rem; font-weight:600; '
+            f'margin:3px 5px 3px 0;">{ad_sozlugu.get(s, s)}</span>'
+            for s in secili
+        )
+        st.markdown(
+            f'<div style="margin-top:6px;"><span style="font-size:0.82rem; color:#5a6b7b !important; '
+            f'font-weight:600; margin-right:6px;">Seçili ({len(secili)}):</span>{pilller}</div>',
+            unsafe_allow_html=True
+        )
+    else:
+        st.info("Hiç hisse seçilmedi — yukarıdaki sektörlerden en az iki hisse işaretleyin.")
+
+    return secili
+
+
 def hisse_secici(key_prefix, varsayilan="THYAO.IS"):
     """Kullanıcının popüler listeden, canlı aramadan veya manuel girişten hisse seçmesini sağlar."""
     mod = st.radio(
@@ -1072,19 +1136,18 @@ denir ve bu basit matris bunu yakalamaz. Kurumsal risk yönetiminde bu yüzden s
 ayrıca test edilir (bkz. Solvency II ve Stres Testi sayfaları).
 """)
 
-    c1, c2 = st.columns([3, 1])
-    with c1:
-        etiketler = [f"{ad} ({sembol})" for sembol, ad in BIST_POPULER]
-        secilen_etiketler = st.multiselect(
-            "Karşılaştırılacak Hisseler", etiketler, default=etiketler[:5], key="korr_secim"
-        )
-        hisse_listesi = [BIST_POPULER[etiketler.index(e)][0] for e in secilen_etiketler]
-        ekstra = st.text_input("İsteğe bağlı ek semboller (virgülle ayırın, örn. AAPL, TSLA)",
-                               value="", key="korr_ekstra")
-        if ekstra.strip():
-            hisse_listesi += [h.strip() for h in ekstra.split(',') if h.strip()]
-    with c2:
+    ust_c1, ust_c2 = st.columns([3, 1])
+    with ust_c2:
         periyot = st.selectbox("Periyot", ["6mo", "1y", "2y", "5y"], index=1, key="korr_periyot")
+
+    st.markdown("**Karşılaştırılacak Hisseler** — sektöre göre gruplanmış listeden seçin")
+    varsayilan_semboller = [s for s, _ in BIST_POPULER[:5]]
+    hisse_listesi = hisse_secim_paneli("korr", varsayilan_semboller)
+    ekstra = st.text_input("İsteğe bağlı ek semboller (virgülle ayırın, örn. AAPL, TSLA)",
+                           value="", key="korr_ekstra")
+    if ekstra.strip():
+        hisse_listesi += [h.strip() for h in ekstra.split(',') if h.strip()]
+    hisse_listesi = list(dict.fromkeys(hisse_listesi))  # aynı sembol iki kez eklenmişse tekilleştir
 
     if len(hisse_listesi) < 2:
         st.info("En az 2 hisse seçin.")
