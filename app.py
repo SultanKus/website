@@ -44,7 +44,6 @@ div.stMetric { background-color: #ffffff; padding: 15px; border-radius: 8px; box
 .model-badge { background-color: #e6f4ea; color: #1e6b34; padding: 6px 12px; border-radius: 6px; font-size: 0.85rem; display: inline-block; margin-bottom: 10px; }
 .demo-badge { background-color: #fff4e5; color: #8a5a00; padding: 6px 12px; border-radius: 6px; font-size: 0.85rem; display: inline-block; margin-bottom: 10px; }
 
-/* --- Çoklu seçim (multiselect) etiketleri: Streamlit'in varsayılan kırmızısı yerine marka mavisi --- */
 .stMultiSelect span[data-baseweb="tag"] {
     background-color: #0055a5 !important;
     border-radius: 20px !important;
@@ -59,7 +58,6 @@ div.stMetric { background-color: #ffffff; padding: 15px; border-radius: 8px; box
 .stMultiSelect span[data-baseweb="tag"] span { color: #ffffff !important; }
 .stMultiSelect span[data-baseweb="tag"] svg { fill: #ffffff !important; opacity: 0.8; }
 .stMultiSelect span[data-baseweb="tag"] svg:hover { opacity: 1; }
-/* Seçim kutusunun kendisi (kapalı/açık hali) */
 .stMultiSelect > div > div,
 .stSelectbox > div > div {
     border-radius: 8px !important;
@@ -70,7 +68,6 @@ div.stMetric { background-color: #ffffff; padding: 15px; border-radius: 8px; box
     border-color: #0055a5 !important;
     box-shadow: 0 0 0 1px #0055a5 !important;
 }
-/* Açılır listedeki seçenekler: hover ve seçili durumda mavi vurgu */
 li[role="option"]:hover { background-color: #e8f1fb !important; }
 li[role="option"][aria-selected="true"] { background-color: #d7e6f7 !important; }
 ul[data-testid="stMultiSelectPopover"] li:hover,
