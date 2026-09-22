@@ -430,50 +430,68 @@ def hisse_secici(key_prefix, varsayilan="THYAO.IS"):
         return st.text_input("Sembol (örn. THYAO.IS, AAPL)", value=varsayilan, key=f"{key_prefix}_manuel")
 
 
-def piyasa_karti(sutun, enstruman, seri, gun_sayisi):
-    """Değer + yüzde rozeti + mini sparkline gösteren tek bir piyasa kartı."""
-    seri = seri.dropna()
-    with sutun:
-        if len(seri) < 2:
-            st.markdown(
-                f'<div class="piyasa-karti"><div class="pk-ad">{enstruman["ad"]}</div>'
-                f'<div class="pk-deger">—</div>'
-                f'<div class="pk-alt">Veri alınamadı</div></div>',
-                unsafe_allow_html=True
-            )
-            return
+# ---------------------------------------------------------
+# INVESTING.COM TARZI YOĞUN TABLO & TICKER BİLEŞENLERİ
+# ---------------------------------------------------------
+INV_CSS = """
+<style>
+.inv-ticker { white-space: nowrap; overflow: hidden; background:#0b1f33;
+              padding:9px 0; border-radius:6px; margin-bottom:16px; }
+.inv-ticker-track { display:inline-block; padding-left:100%;
+                     animation: inv-scroll 32s linear infinite; }
+.inv-ticker:hover .inv-ticker-track { animation-play-state: paused; }
+@keyframes inv-scroll { 0% { transform: translateX(0); } 100% { transform: translateX(-100%); } }
+.inv-ticker-item { display:inline-block; padding:0 26px; color:#dfe6ee !important;
+                    font-size:0.83rem; font-weight:600; border-right:1px solid rgba(255,255,255,0.12); }
+.inv-ticker-item b { color:#ffffff !important; font-weight:700; margin:0 5px; }
+.inv-up { color:#3ddc84 !important; font-weight:700; }
+.inv-down { color:#ff5c5c !important; font-weight:700; }
+.inv-table-wrap { overflow-x:auto; border:1px solid #e2e6ea; border-radius:8px; margin-bottom:8px; }
+table.inv-table { width:100%; border-collapse:collapse; font-size:0.86rem; background:#fff; }
+table.inv-table th { text-align:right; text-transform:uppercase; font-size:0.70rem; letter-spacing:0.5px;
+                      color:#5a6b7b !important; background:#f8f9fb; border-bottom:2px solid #e2e6ea;
+                      padding:9px 12px; white-space:nowrap; }
+table.inv-table th:first-child, table.inv-table td:first-child { text-align:left; }
+table.inv-table td { text-align:right; padding:9px 12px; border-bottom:1px solid #eef1f4;
+                      color:#0b1f33 !important; white-space:nowrap; font-variant-numeric: tabular-nums; }
+table.inv-table tbody tr:hover { background:#f5f8fb; }
+table.inv-table tbody tr:last-child td { border-bottom:none; }
+.inv-name-cell { font-weight:700 !important; }
+.inv-pos { color:#1e6b34 !important; font-weight:700; }
+.inv-neg { color:#b3261e !important; font-weight:700; }
+.inv-badge-pos { background:rgba(30,107,52,0.12); color:#1e6b34 !important;
+                 padding:3px 9px; border-radius:4px; font-weight:700; display:inline-block; }
+.inv-badge-neg { background:rgba(179,38,30,0.12); color:#b3261e !important;
+                 padding:3px 9px; border-radius:4px; font-weight:700; display:inline-block; }
+</style>
+"""
 
-        dilim = seri.iloc[-(gun_sayisi + 1):] if len(seri) > gun_sayisi else seri
-        son = dilim.iloc[-1]
-        degisim = (son / dilim.iloc[0] - 1) * 100 if dilim.iloc[0] else 0.0
-        artis = degisim >= 0
-        renk = "#1e6b34" if artis else "#b3261e"
-        arka = "rgba(30,107,52,0.10)" if artis else "rgba(179,38,30,0.10)"
-        ok = "▲" if artis else "▼"
 
-        st.markdown(f"""
-        <div class="piyasa-karti" style="border-left: 4px solid {renk};">
-            <div class="pk-ad">{enstruman['ad']}</div>
-            <div class="pk-deger">{enstruman['birim']}{tr_sayi(son, enstruman['ondalik'])}</div>
-            <div class="pk-rozet" style="color:{renk}; background:{arka};">
-                {ok} %{tr_sayi(abs(degisim), 2)}
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
-        fig = go.Figure(go.Scatter(
-            x=dilim.index, y=dilim.values, mode="lines",
-            line=dict(color=renk, width=2),
-            fill="tozeroy", fillcolor=arka,
-            hovertemplate="%{x|%d.%m.%Y}<br>%{y:,.2f}<extra></extra>"
-        ))
-        fig.update_layout(
-            height=70, margin=dict(l=0, r=0, t=0, b=0),
-            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-            xaxis=dict(visible=False), yaxis=dict(visible=False, range=[dilim.min() * 0.995, dilim.max() * 1.005]),
-            showlegend=False
+def inv_ticker_goster(satirlar):
+    """satirlar: [(ad, deger, yuzde_degisim, birim, ondalik), ...] — Investing.com tarzı akan şerit."""
+    parcalar = []
+    for ad, deger, chg, birim, ondalik in satirlar:
+        pos = chg >= 0
+        ok = "▲" if pos else "▼"
+        renk = "inv-up" if pos else "inv-down"
+        parcalar.append(
+            f'<span class="inv-ticker-item">{ad} <b>{birim}{tr_sayi(deger, ondalik)}</b> '
+            f'<span class="{renk}">{ok} %{tr_sayi(abs(chg), 2)}</span></span>'
         )
-        st.plotly_chart(fig, config={"displayModeBar": False}, width="stretch")
+    icerik = "".join(parcalar)
+    st.markdown(f'<div class="inv-ticker"><div class="inv-ticker-track">{icerik}{icerik}</div></div>',
+                unsafe_allow_html=True)
+
+
+def inv_tablo_goster(basliklar, satirlar_html):
+    """basliklar: kolon adları listesi. satirlar_html: hazır <tr>...</tr> HTML string listesi."""
+    th = "".join(f"<th>{b}</th>" for b in basliklar)
+    gövde = "".join(satirlar_html)
+    st.markdown(
+        f'<div class="inv-table-wrap"><table class="inv-table"><thead><tr>{th}</tr></thead>'
+        f'<tbody>{gövde}</tbody></table></div>',
+        unsafe_allow_html=True
+    )
 
 # ---------------------------------------------------------
 # GENEL BAKIŞ & CANLI PİYASA SAYFALARI
@@ -597,18 +615,7 @@ def ana_sayfa():
     """)
 
 def finansal_bilgi_sayfasi():
-    st.markdown("""
-    <style>
-    .piyasa-karti { background:#ffffff; border-radius:10px; padding:14px 16px 6px 16px;
-                    box-shadow:0 2px 6px rgba(0,0,0,0.06); margin-bottom:-10px; }
-    .pk-ad     { font-size:0.80rem; text-transform:uppercase; letter-spacing:0.6px;
-                 color:#5a6b7b !important; font-weight:600; }
-    .pk-deger  { font-size:1.65rem; font-weight:700; color:#0b1f33 !important; line-height:1.4; }
-    .pk-rozet  { display:inline-block; padding:2px 8px; border-radius:6px;
-                 font-size:0.82rem; font-weight:700; }
-    .pk-alt    { font-size:0.85rem; color:#8a97a3 !important; }
-    </style>
-    """, unsafe_allow_html=True)
+    st.markdown(INV_CSS, unsafe_allow_html=True)
 
     st.header("🌍 Canlı Makroekonomi & Küresel Piyasalar")
     st.markdown(
@@ -652,12 +659,47 @@ daha anlamlıdır.
     son_tarih = pano.index[-1].strftime("%d.%m.%Y")
     st.caption(f"Son veri tarihi: {son_tarih} · Kaynak: Yahoo Finance")
 
-    # --- Kart paneli (2 satır × 4 sütun) ---
     mevcut = [e for e in PANO_ENSTRUMANLARI if e["kod"] in pano.columns]
-    for satir_baslangic in range(0, len(mevcut), 4):
-        sutunlar = st.columns(4)
-        for sutun, enstruman in zip(sutunlar, mevcut[satir_baslangic:satir_baslangic + 4]):
-            piyasa_karti(sutun, enstruman, pano[enstruman["kod"]], gun_sayisi)
+
+    # --- Akan piyasa şeridi (günlük değişim) ---
+    ticker_satirlari = []
+    for e in mevcut:
+        seri = pano[e["kod"]].dropna()
+        gunluk = _degisim_yuzde(seri, 1)
+        if len(seri) >= 1 and gunluk is not None:
+            ticker_satirlari.append((e["ad"], seri.iloc[-1], gunluk, e["birim"], e["ondalik"]))
+    if ticker_satirlari:
+        inv_ticker_goster(ticker_satirlari)
+
+    # --- Yoğun genel bakış tablosu (seçilen periyoda göre) ---
+    st.subheader("📋 Piyasa Özeti")
+    satirlar_html = []
+    for e in mevcut:
+        seri = pano[e["kod"]].dropna()
+        if len(seri) < 2:
+            continue
+        dilim = seri.iloc[-(gun_sayisi + 1):] if len(seri) > gun_sayisi else seri
+        son, ilk = dilim.iloc[-1], dilim.iloc[0]
+        degisim_mutlak = son - ilk
+        degisim_yuzde = (son / ilk - 1) * 100 if ilk else 0.0
+        yuksek, dusuk = dilim.max(), dilim.min()
+        pos = degisim_yuzde >= 0
+        klas = "inv-pos" if pos else "inv-neg"
+        rozet = "inv-badge-pos" if pos else "inv-badge-neg"
+        ok = "▲" if pos else "▼"
+        satirlar_html.append(f"""
+        <tr>
+            <td class="inv-name-cell">{e['ad']}</td>
+            <td>{e['birim']}{tr_sayi(son, e['ondalik'])}</td>
+            <td class="{klas}">{'+' if pos else ''}{tr_sayi(degisim_mutlak, e['ondalik'])}</td>
+            <td><span class="{rozet}">{ok} %{tr_sayi(abs(degisim_yuzde), 2)}</span></td>
+            <td>{e['birim']}{tr_sayi(yuksek, e['ondalik'])}</td>
+            <td>{e['birim']}{tr_sayi(dusuk, e['ondalik'])}</td>
+        </tr>""")
+    inv_tablo_goster(
+        ["Enstrüman", "Son", "Değişim", "Değişim %", f"{periyot_etiket} Yüksek", f"{periyot_etiket} Düşük"],
+        satirlar_html
+    )
 
     st.markdown("---")
 
@@ -941,18 +983,7 @@ def _coklu_hisse_kapanis_getir(hisseler, periyot):
 
 
 def veri_analizi_sayfasi():
-    st.markdown("""
-    <style>
-    .piyasa-karti { background:#ffffff; border-radius:10px; padding:14px 16px 6px 16px;
-                    box-shadow:0 2px 6px rgba(0,0,0,0.06); margin-bottom:-10px; }
-    .pk-ad     { font-size:0.80rem; text-transform:uppercase; letter-spacing:0.6px;
-                 color:#5a6b7b !important; font-weight:600; }
-    .pk-deger  { font-size:1.45rem; font-weight:700; color:#0b1f33 !important; line-height:1.4; }
-    .pk-rozet  { display:inline-block; padding:2px 8px; border-radius:6px;
-                 font-size:0.82rem; font-weight:700; }
-    .pk-alt    { font-size:0.85rem; color:#8a97a3 !important; }
-    </style>
-    """, unsafe_allow_html=True)
+    st.markdown(INV_CSS, unsafe_allow_html=True)
 
     st.header("📈 Canlı Hisse Korelasyon & Performans Analizi")
     st.markdown(
@@ -1021,17 +1052,52 @@ ayrıca test edilir (bkz. Solvency II ve Stres Testi sayfaları).
         return
 
     ad_sozlugu = dict(BIST_POPULER)
+    df_getiri_tum = df_fiyat.pct_change().dropna()
 
-    # --- Kart paneli: her hisse için son fiyat + dönem getirisi + sparkline ---
-    st.subheader("🧾 Seçilen Hisseler")
+    # --- Akan şerit: seçilen hisseler, dönem başından bugüne değişim ---
     hisseler = list(df_fiyat.columns)
-    for satir_baslangic in range(0, len(hisseler), 4):
-        sutunlar = st.columns(4)
-        for sutun, sembol in zip(sutunlar, hisseler[satir_baslangic:satir_baslangic + 4]):
-            seri = df_fiyat[sembol].dropna()
-            enstruman = {"ad": ad_sozlugu.get(sembol, sembol), "birim": "", "ondalik": 2}
-            gun_sayisi = max(len(seri) - 1, 1)
-            piyasa_karti(sutun, enstruman, seri, gun_sayisi)
+    ticker_satirlari = []
+    for sembol in hisseler:
+        seri = df_fiyat[sembol].dropna()
+        if len(seri) < 2 or seri.iloc[0] == 0:
+            continue
+        chg = (seri.iloc[-1] / seri.iloc[0] - 1) * 100
+        ticker_satirlari.append((ad_sozlugu.get(sembol, sembol), seri.iloc[-1], chg, "", 2))
+    if ticker_satirlari:
+        inv_ticker_goster(ticker_satirlari)
+
+    # --- Yoğun izleme listesi tablosu ---
+    st.subheader("🧾 Seçilen Hisseler — İzleme Listesi")
+    satirlar_html = []
+    for sembol in hisseler:
+        seri = df_fiyat[sembol].dropna()
+        if len(seri) < 2:
+            continue
+        son, ilk = seri.iloc[-1], seri.iloc[0]
+        degisim_mutlak = son - ilk
+        degisim_yuzde = (son / ilk - 1) * 100 if ilk else 0.0
+        yuksek, dusuk = seri.max(), seri.min()
+        getiri_serisi = df_getiri_tum[sembol].dropna() if sembol in df_getiri_tum.columns else pd.Series(dtype=float)
+        yillik_vol = getiri_serisi.std() * np.sqrt(252) * 100 if not getiri_serisi.empty else float("nan")
+        pos = degisim_yuzde >= 0
+        klas = "inv-pos" if pos else "inv-neg"
+        rozet = "inv-badge-pos" if pos else "inv-badge-neg"
+        ok = "▲" if pos else "▼"
+        vol_metin = "—" if pd.isna(yillik_vol) else f"%{tr_sayi(yillik_vol, 1)}"
+        satirlar_html.append(f"""
+        <tr>
+            <td class="inv-name-cell">{ad_sozlugu.get(sembol, sembol)}</td>
+            <td>{tr_sayi(son, 2)}</td>
+            <td class="{klas}">{'+' if pos else ''}{tr_sayi(degisim_mutlak, 2)}</td>
+            <td><span class="{rozet}">{ok} %{tr_sayi(abs(degisim_yuzde), 2)}</span></td>
+            <td>{tr_sayi(yuksek, 2)}</td>
+            <td>{tr_sayi(dusuk, 2)}</td>
+            <td>{vol_metin}</td>
+        </tr>""")
+    inv_tablo_goster(
+        ["Hisse", "Son", "Değişim", "Değişim %", f"{periyot} Yüksek", f"{periyot} Düşük", "Yıllık Volatilite"],
+        satirlar_html
+    )
 
     st.markdown("---")
 
