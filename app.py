@@ -43,6 +43,38 @@ div.stMetric { background-color: #ffffff; padding: 15px; border-radius: 8px; box
 .stButton>button:hover { background-color: #003d73; color: white; }
 .model-badge { background-color: #e6f4ea; color: #1e6b34; padding: 6px 12px; border-radius: 6px; font-size: 0.85rem; display: inline-block; margin-bottom: 10px; }
 .demo-badge { background-color: #fff4e5; color: #8a5a00; padding: 6px 12px; border-radius: 6px; font-size: 0.85rem; display: inline-block; margin-bottom: 10px; }
+
+/* --- Çoklu seçim (multiselect) etiketleri: Streamlit'in varsayılan kırmızısı yerine marka mavisi --- */
+.stMultiSelect span[data-baseweb="tag"] {
+    background-color: #0055a5 !important;
+    border-radius: 20px !important;
+    padding: 3px 6px 3px 12px !important;
+    font-weight: 600 !important;
+    font-size: 0.85rem !important;
+    border: none !important;
+    box-shadow: 0 1px 3px rgba(0,85,165,0.25);
+    transition: background-color 0.15s ease;
+}
+.stMultiSelect span[data-baseweb="tag"]:hover { background-color: #003d73 !important; }
+.stMultiSelect span[data-baseweb="tag"] span { color: #ffffff !important; }
+.stMultiSelect span[data-baseweb="tag"] svg { fill: #ffffff !important; opacity: 0.8; }
+.stMultiSelect span[data-baseweb="tag"] svg:hover { opacity: 1; }
+/* Seçim kutusunun kendisi (kapalı/açık hali) */
+.stMultiSelect > div > div,
+.stSelectbox > div > div {
+    border-radius: 8px !important;
+    border-color: #d5dce3 !important;
+}
+.stMultiSelect > div > div:focus-within,
+.stSelectbox > div > div:focus-within {
+    border-color: #0055a5 !important;
+    box-shadow: 0 0 0 1px #0055a5 !important;
+}
+/* Açılır listedeki seçenekler: hover ve seçili durumda mavi vurgu */
+li[role="option"]:hover { background-color: #e8f1fb !important; }
+li[role="option"][aria-selected="true"] { background-color: #d7e6f7 !important; }
+ul[data-testid="stMultiSelectPopover"] li:hover,
+div[data-baseweb="popover"] li:hover { background-color: #e8f1fb !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -400,7 +432,14 @@ BIST_POPULER = [
     ("EREGL.IS", "Ereğli Demir Çelik"), ("TUPRS.IS", "Tüpraş"), ("ASELS.IS", "Aselsan"),
     ("GARAN.IS", "Garanti BBVA"), ("SISE.IS", "Şişecam"), ("PGSUS.IS", "Pegasus"),
     ("YKBNK.IS", "Yapı Kredi"), ("TCELL.IS", "Turkcell"), ("ISCTR.IS", "İş Bankası C"),
+    ("HALKB.IS", "Halkbank"), ("VAKBN.IS", "VakıfBank"), ("HEKTS.IS", "Hektaş"),
+    ("KOZAL.IS", "Koza Altın"), ("KOZAA.IS", "Koza Madencilik"), ("ARCLK.IS", "Arçelik"),
+    ("TOASO.IS", "Tofaş"), ("TAVHL.IS", "TAV Havalimanları"), ("MGROS.IS", "Migros"),
+    ("ENJSA.IS", "Enerjisa"), ("PETKM.IS", "Petkim"), ("ALARK.IS", "Alarko Holding"),
+    ("TTKOM.IS", "Türk Telekom"), ("CCOLA.IS", "Coca-Cola İçecek"), ("ULKER.IS", "Ülker"),
+    ("DOAS.IS", "Doğuş Otomotiv"), ("VESTL.IS", "Vestel"), ("GUBRF.IS", "Gübre Fabrikaları"),
 ]
+
 
 
 def hisse_secici(key_prefix, varsayilan="THYAO.IS"):
