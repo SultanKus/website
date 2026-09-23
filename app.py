@@ -167,10 +167,6 @@ def kasko_glm_egit():
 
 # ---------------------------------------------------------
 # SENTETİK (AMA MANTIKSAL İLİŞKİLİ) EĞİTİM VERİSİ ÜRETİCİLERİ
-# Not: Bu üreticiler rastgele etiket atamaz; hedef değişken,
-# bilinen risk faktörlerinin lojistik bir fonksiyonu olarak kurulur.
-# Gerçek şirket verisi yerine geçmez — amaç, doğru ML metodolojisini
-# (train/test split + AUC/F1 doğrulaması) dürüstçe göstermektir.
 # ---------------------------------------------------------
 def _sentetik_veri_kredi(n=4000, seed=3):
     rng = np.random.default_rng(seed)
@@ -211,7 +207,6 @@ def _sentetik_veri_fraud(n=4000, seed=11):
 
 @st.cache_resource
 def kredi_risk_modelini_egit():
-    """Önce gerçek OpenML German Credit veri setini dener; olmazsa sentetik veriye düşer (graceful degradation)."""
     try:
         veri = fetch_openml(name='credit-g', version=1, as_frame=True, parser='auto')
         df = veri.frame.copy()
@@ -269,7 +264,6 @@ def fraud_modelini_egit():
 # ---------------------------------------------------------
 @st.cache_data(ttl=3600)
 def markowitz_veri_getir(hisseler, periyot="2y"):
-    """Canlı fiyat verisinden yıllıklandırılmış beklenen getiri ve kovaryans matrisini hesaplar."""
     fiyatlar = pd.DataFrame()
     for h in hisseler:
         veri = yf.Ticker(h).history(period=periyot)['Close']
@@ -285,14 +279,12 @@ def _portfoy_varyansi(agirliklar, kovaryans):
     return agirliklar @ kovaryans.values @ agirliklar
 
 def min_varyans_agirliklari(kovaryans, hedef_getiri, ort_getiri):
-    """Belirli bir hedef getiriyi sağlayan minimum varyanslı portföyü SLSQP (Sequential Least Squares
-    Quadratic Programming) ile çözer — KKT koşullarını sayısal olarak sağlayan gerçek bir optimizasyondur."""
     n = len(ort_getiri)
     kisitlar = [
         {'type': 'eq', 'fun': lambda w: np.sum(w) - 1},
         {'type': 'eq', 'fun': lambda w: np.dot(w, ort_getiri) - hedef_getiri},
     ]
-    sinirlar = tuple((0.0, 1.0) for _ in range(n))  # açığa satış yok
+    sinirlar = tuple((0.0, 1.0) for _ in range(n))
     sonuc = minimize(_portfoy_varyansi, x0=np.repeat(1 / n, n), args=(kovaryans,),
                       method='SLSQP', bounds=sinirlar, constraints=kisitlar)
     return sonuc.x if sonuc.success else None
@@ -309,10 +301,9 @@ def maksimum_sharpe_agirliklari(kovaryans, ort_getiri, risksiz_oran=0.30):
     return sonuc.x if sonuc.success else None
 
 # ---------------------------------------------------------
-# CANLI PİYASA VERİSİ (yfinance) — Makroekonomi & Piyasalar sayfası için ortak yardımcılar
+# CANLI PİYASA VERİSİ (yfinance)
 # ---------------------------------------------------------
 def tr_sayi(x, ondalik=2):
-    """1234567.89 -> '1.234.567,89' (Türkçe sayı biçimi)."""
     try:
         s = f"{float(x):,.{ondalik}f}"
     except (TypeError, ValueError):
@@ -321,7 +312,6 @@ def tr_sayi(x, ondalik=2):
 
 
 def _degisim_yuzde(seri, gun):
-    """`gun` kadar geri gidip yüzde değişim hesaplar; yetersiz veri varsa None."""
     seri = seri.dropna()
     if len(seri) < 2:
         return None
@@ -333,7 +323,6 @@ def _degisim_yuzde(seri, gun):
 
 
 def _ybb_degisim(seri):
-    """Yılbaşından bugüne değişim."""
     seri = seri.dropna()
     if seri.empty:
         return None
@@ -344,7 +333,6 @@ def _ybb_degisim(seri):
 
 
 def _rsi(seri, periyot=14):
-    """Wilder yöntemiyle Relative Strength Index."""
     delta = seri.diff()
     kazanc = delta.clip(lower=0).ewm(alpha=1 / periyot, adjust=False).mean()
     kayip = (-delta.clip(upper=0)).ewm(alpha=1 / periyot, adjust=False).mean()
@@ -352,9 +340,8 @@ def _rsi(seri, periyot=14):
     return 100 - (100 / (1 + rs))
 
 
-ONS_GRAM = 31.1034768  # 1 troy ons = 31.1034768 gram
+ONS_GRAM = 31.1034768
 
-# Panoda ve tabloda gösterilecek enstrümanlar
 PANO_ENSTRUMANLARI = [
     {"kod": "XU100.IS",   "ad": "BIST 100",       "birim": "",   "ondalik": 0},
     {"kod": "TRY=X",      "ad": "Dolar / TL",     "birim": "₺",  "ondalik": 4},
@@ -373,12 +360,6 @@ PERIYOT_SECENEKLERI = {"1 Hafta": 5, "1 Ay": 22, "3 Ay": 66, "6 Ay": 132, "1 Yı
 
 @st.cache_data(ttl=900, show_spinner=False)
 def pano_verisi_getir():
-    """
-    Tüm pano enstrümanlarının 1 yıllık kapanış serilerini TEK bir yfinance
-    çağrısıyla indirir (8 ayrı istek yerine 1 istek — sayfa çok daha hızlı açılır).
-    Gram altın, ons altın ve USD/TRY serilerinden türetilir:
-        Gram Altın (TL) = Ons Altın ($) / 31.1035 × USD/TRY
-    """
     ham = yf.download(PANO_SEMBOLLERI, period="1y", progress=False,
                       auto_adjust=True, threads=True)
     if ham is None or ham.empty:
@@ -386,11 +367,10 @@ def pano_verisi_getir():
 
     if isinstance(ham.columns, pd.MultiIndex):
         kapanis = ham["Close"].copy()
-    else:  # tek sembol dönerse
+    else:
         kapanis = ham[["Close"]].copy()
         kapanis.columns = PANO_SEMBOLLERI[:1]
 
-    # Farklı borsalar farklı saat dilimi döndürebiliyor; indeksi normalize ediyoruz.
     try:
         if getattr(kapanis.index, "tz", None) is not None:
             kapanis.index = kapanis.index.tz_localize(None)
@@ -398,7 +378,6 @@ def pano_verisi_getir():
         pass
     kapanis.index = pd.to_datetime(kapanis.index).normalize()
 
-    # BIST tatilde, kripto 7/24 → boşlukları son bilinen fiyatla dolduruyoruz.
     kapanis = kapanis.ffill().dropna(how="all")
 
     if {"GC=F", "TRY=X"}.issubset(kapanis.columns):
@@ -414,7 +393,6 @@ def canli_piyasa_verisi_getir(sembol, periyot="1y"):
 
 @st.cache_data(ttl=1800, show_spinner=False)
 def hisse_ara(sorgu, max_sonuc=8):
-    """Yahoo Finance canlı arama servisiyle şirket adı/sembol eşleştirir (gerçek zamanlı otomatik tamamlama)."""
     try:
         sonuc = yf.Search(sorgu, max_results=max_sonuc)
         quotes = getattr(sonuc, "quotes", [])
@@ -443,8 +421,6 @@ BIST_POPULER = [
     ("KARSN.IS", "Karsan Otomotiv"), ("OTKAR.IS", "Otokar"), ("CIMSA.IS", "Çimsa"),
     ("OYAKC.IS", "OYAK Çimento"), ("KLKIM.IS", "Kalekim"), ("KONTR.IS", "Kontrolmatik"),
 ]
-
-
 
 BIST_SEKTORU = {
     "THYAO.IS": "Havacılık & Ulaştırma", "PGSUS.IS": "Havacılık & Ulaştırma", "TAVHL.IS": "Havacılık & Ulaştırma",
@@ -477,9 +453,6 @@ SEKTOR_SIRASI = [
 
 
 def hisse_secim_paneli(key_prefix, varsayilan_semboller):
-    """Sektöre göre gruplanmış, aranabilir, açılır kutucuklu (checkbox) hisse seçim paneli.
-    Investing.com/TradingView'daki 'watchlist oluştur' deneyimine benzer;
-    kırmızı/mavi renk sorununa yol açan multiselect etiketleri yerine geçer."""
     ad_sozlugu = dict(BIST_POPULER)
     sektorler = {}
     for sembol, ad in BIST_POPULER:
@@ -513,7 +486,6 @@ def hisse_secim_paneli(key_prefix, varsayilan_semboller):
                 with kolonlar[i % 3]:
                     st.checkbox(ad, value=(sembol in varsayilan_semboller), key=f"{key_prefix}_chk_{sembol}")
 
-    # Görünürde olmasa bile (arama filtreliyken) tüm işaretli hisseleri topla
     secili = [sembol for sembol, _ in BIST_POPULER
               if st.session_state.get(f"{key_prefix}_chk_{sembol}", sembol in varsayilan_semboller)]
 
@@ -536,7 +508,6 @@ def hisse_secim_paneli(key_prefix, varsayilan_semboller):
 
 
 def hisse_secici(key_prefix, varsayilan="THYAO.IS"):
-    """Kullanıcının popüler listeden, canlı aramadan veya manuel girişten hisse seçmesini sağlar."""
     mod = st.radio(
         "Hisse Seçim Yöntemi",
         ["Popüler Listeden Seç", "Şirket Adıyla Ara (canlı)", "Manuel Sembol Gir"],
@@ -567,7 +538,6 @@ def hisse_secici(key_prefix, varsayilan="THYAO.IS"):
 # ---------------------------------------------------------
 INV_CSS = """
 <style>
-/* --- üstteki ince akan şerit --- */
 .inv-ticker { white-space: nowrap; overflow: hidden; background:#0b1220;
               padding:8px 0; border-radius:6px; margin-bottom:18px; }
 .inv-ticker-track { display:inline-block; padding-left:100%;
@@ -581,7 +551,6 @@ INV_CSS = """
 .inv-up { color:#16c784 !important; font-weight:700; }
 .inv-down { color:#f0475c !important; font-weight:700; }
 
-/* --- büyük izleme listesi tablosu --- */
 .inv2-wrap { border:1px solid #e4e8ec; border-radius:10px; overflow-x:auto; overflow-y:hidden;
              background:#ffffff; margin-bottom:6px; box-shadow:0 1px 2px rgba(11,31,51,0.04); }
 table.inv2-table { width:100%; border-collapse:collapse; font-size:0.865rem; min-width:900px; }
@@ -616,15 +585,27 @@ table.inv2-table tbody tr:last-child td { border-bottom:none; }
 .inv2-spark-cell { line-height:0; }
 .inv2-hdr-row { display:flex; align-items:baseline; justify-content:space-between; margin-bottom:10px; }
 .inv2-hdr-row .inv2-count { font-size:0.8rem; color:#7a8794 !important; font-weight:600; }
+
+/* --- sektör grubu başlığı (yeni) --- */
+.inv2-sector-hdr { display:flex; align-items:center; gap:10px; margin:22px 0 8px 0; }
+.inv2-sector-hdr .inv2-sector-bar { width:4px; height:16px; border-radius:2px; background:#0055a5; }
+.inv2-sector-hdr .inv2-sector-name { font-size:0.95rem; font-weight:800; color:#0b1f33 !important; }
+.inv2-sector-hdr .inv2-sector-count { font-size:0.76rem; color:#8a97a3 !important; font-weight:600; }
 </style>
 """
 
 _INV2_RENKLER = ["#0055a5", "#7a4fd6", "#c9820a", "#0f9d58", "#c2364d",
                   "#1b8fa0", "#8a5a00", "#4b5f7a", "#a0479a", "#2f7d3a"]
 
+_SEKTOR_RENKLERI = {
+    "Bankacılık": "#0055a5", "Holding & Sanayi": "#4b5f7a", "Havacılık & Ulaştırma": "#1b8fa0",
+    "Otomotiv": "#c9820a", "Perakende & Gıda": "#0f9d58", "Teknoloji & Telekom": "#7a4fd6",
+    "Enerji & Madencilik": "#8a5a00", "Dayanıklı Tüketim": "#a0479a", "Sigorta": "#c2364d",
+    "İnşaat & GYO": "#2f7d3a", "Sağlık": "#0aa3a3", "Diğer": "#5a6b7b",
+}
+
 
 def inv_ticker_goster(satirlar):
-    """satirlar: [(ad, deger, yuzde_degisim, birim, ondalik), ...] — üstteki ince akan şerit."""
     parcalar = []
     for ad, deger, chg, birim, ondalik in satirlar:
         pos = chg >= 0
@@ -640,8 +621,6 @@ def inv_ticker_goster(satirlar):
 
 
 def _inv2_spark_svg(seri, pos, w=104, h=34):
-    """Küçük, hafif bir alan (sparkline) grafiği — SVG olarak, plotly'siz. Investing.com'daki
-    mini grafik sütununun karşılığı; 60'tan fazla noktayı seyrekleştirir ki HTML şişmesin."""
     deger = seri.dropna().values
     if len(deger) < 2:
         return '<span style="color:#c3cad1;">—</span>'
@@ -675,9 +654,6 @@ def _inv2_hacim_metni(v):
 
 
 def inv2_watchlist_goster(satirlar, kolon_araligi_baslik="Dönem Aralığı"):
-    """satirlar: her biri dict — {ad, sembol, sektor, son, degisim, degisim_yuzde,
-    min_, maks_, hacim, seri (pd.Series), renk}. Investing.com ana sayfasındaki
-    büyük izleme listesi tablosunun karşılığı."""
     satirlar_html = []
     for i, r in enumerate(satirlar):
         pos = r["degisim_yuzde"] >= 0
@@ -719,8 +695,32 @@ def inv2_watchlist_goster(satirlar, kolon_araligi_baslik="Dönem Aralığı"):
         unsafe_allow_html=True
     )
 
+
+def inv2_watchlist_sektorel_goster(satirlar, kolon_araligi_baslik="Dönem Aralığı"):
+    """satirlar tek bir düz liste olarak gelir; burada 'sektor' alanına göre gruplanıp
+    her sektör kendi başlığı ve kendi tablosuyla ayrı ayrı gösterilir (Sigorta, Bankacılık, ...)."""
+    gruplar = {}
+    for r in satirlar:
+        gruplar.setdefault(r.get("sektor", "Diğer"), []).append(r)
+
+    sira = [s for s in SEKTOR_SIRASI if s in gruplar] + [s for s in gruplar if s not in SEKTOR_SIRASI]
+
+    for sektor in sira:
+        grup = sorted(gruplar[sektor], key=lambda r: r["degisim_yuzde"], reverse=True)
+        renk = _SEKTOR_RENKLERI.get(sektor, "#0055a5")
+        st.markdown(
+            f'<div class="inv2-sector-hdr">'
+            f'<span class="inv2-sector-bar" style="background:{renk};"></span>'
+            f'<span class="inv2-sector-name">{sektor}</span>'
+            f'<span class="inv2-sector-count">· {len(grup)} hisse</span>'
+            f'</div>',
+            unsafe_allow_html=True
+        )
+        for r in grup:
+            r["renk"] = renk
+        inv2_watchlist_goster(grup, kolon_araligi_baslik=kolon_araligi_baslik)
+
 def piyasa_karti(sutun, enstruman, seri, gun_sayisi):
-    """Değer + yüzde rozeti + mini sparkline gösteren tek bir piyasa kartı (Makroekonomi sayfası için)."""
     seri = seri.dropna()
     with sutun:
         if len(seri) < 2:
@@ -941,7 +941,6 @@ daha anlamlıdır.
     son_tarih = pano.index[-1].strftime("%d.%m.%Y")
     st.caption(f"Son veri tarihi: {son_tarih} · Kaynak: Yahoo Finance")
 
-    # --- Kart paneli (2 satır × 4 sütun) ---
     mevcut = [e for e in PANO_ENSTRUMANLARI if e["kod"] in pano.columns]
     for satir_baslangic in range(0, len(mevcut), 4):
         sutunlar = st.columns(4)
@@ -950,7 +949,6 @@ daha anlamlıdır.
 
     st.markdown("---")
 
-    # --- Çok dönemli getiri tablosu ---
     st.subheader("📋 Dönemsel Getiri Karşılaştırması")
     st.caption("Her enstrümanın farklı zaman ölçeklerindeki yüzde değişimi — hangi varlığın hangi dönemde öne çıktığını gösterir.")
 
@@ -983,7 +981,6 @@ daha anlamlıdır.
             else stil.applymap(_renk, subset=yuzde_kolonlari))
     st.dataframe(stil, width="stretch", hide_index=True)
 
-    # --- Normalize edilmiş karşılaştırma grafiği ---
     st.subheader("📈 Bazlanmış Performans Karşılaştırması")
     egitim_notu("""
 Farklı ölçekteki serileri (BIST 100 ≈ 10.000 puan, dolar ≈ 40 TL) aynı grafikte ham haliyle çizmek
@@ -1017,9 +1014,6 @@ getiri kritiktir (bkz. Piyasa Kıyaslama sayfası — reel getiri hesabı).
 
     st.markdown("---")
 
-    # ---------------------------------------------------------
-    # TCMB EVDS
-    # ---------------------------------------------------------
     st.subheader("🏛️ TCMB EVDS Veri Analizi")
     EVDS_SERILERI = {
         "USD/TRY (Alış, Günlük)": "TP.DK.USD.A",
@@ -1088,9 +1082,6 @@ getiri kritiktir (bkz. Piyasa Kıyaslama sayfası — reel getiri hesabı).
 
     st.markdown("---")
 
-    # ---------------------------------------------------------
-    # TEKNİK ANALİZ
-    # ---------------------------------------------------------
     st.subheader("📈 Gerçek Zamanlı Hisse Teknik Analizi")
     egitim_notu("""
 Bu paneldeki göstergeler fiyatın kendisinden türetilir; yani yeni bilgi eklemezler, mevcut fiyat
@@ -1211,8 +1202,6 @@ tam olarak kendisidir — yani buradaki teknik panel ile kantitatif modüller ay
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def _coklu_hisse_kapanis_getir(hisseler, periyot):
-    """Birden çok sembolün kapanış fiyatı VE hacmini TEK yfinance çağrısıyla indirir.
-    (kapanis_df, hacim_df) döner — watchlist tablosundaki Hacim sütunu için."""
     hisseler = list(hisseler)
     ham = yf.download(hisseler, period=periyot, progress=False, auto_adjust=True, threads=True)
     if ham is None or ham.empty:
@@ -1279,7 +1268,7 @@ ayrıca test edilir (bkz. Solvency II ve Stres Testi sayfaları).
                            value="", key="korr_ekstra")
     if ekstra.strip():
         hisse_listesi += [h.strip() for h in ekstra.split(',') if h.strip()]
-    hisse_listesi = list(dict.fromkeys(hisse_listesi))  # aynı sembol iki kez eklenmişse tekilleştir
+    hisse_listesi = list(dict.fromkeys(hisse_listesi))
 
     if len(hisse_listesi) < 2:
         st.info("En az 2 hisse seçin.")
@@ -1308,7 +1297,6 @@ ayrıca test edilir (bkz. Solvency II ve Stres Testi sayfaları).
     df_getiri_tum = df_fiyat.pct_change().dropna()
     hisseler = list(df_fiyat.columns)
 
-    # --- Üstte ince akan şerit ---
     ticker_satirlari = []
     for sembol in hisseler:
         seri = df_fiyat[sembol].dropna()
@@ -1319,9 +1307,8 @@ ayrıca test edilir (bkz. Solvency II ve Stres Testi sayfaları).
     if ticker_satirlari:
         inv_ticker_goster(ticker_satirlari)
 
-    # --- BÜYÜK İZLEME LİSTESİ TABLOSU (Investing.com tarzı) ---
     st.markdown(
-        f'<div class="inv2-hdr-row"><h3 style="margin:0;">🧾 İzleme Listesi</h3>'
+        f'<div class="inv2-hdr-row"><h3 style="margin:0;">🧾 İzleme Listesi — Sektöre Göre</h3>'
         f'<span class="inv2-count">{len(hisseler)} hisse · {periyot} · Yahoo Finance</span></div>',
         unsafe_allow_html=True
     )
@@ -1339,19 +1326,19 @@ ayrıca test edilir (bkz. Solvency II ve Stres Testi sayfaları).
                      else None)
         satirlar.append({
             "ad": ad_sozlugu.get(sembol, sembol), "sembol": sembol,
-            "sektor": BIST_SEKTORU.get(sembol, sembol),
+            "sektor": BIST_SEKTORU.get(sembol, "Diğer"),
             "son": son, "degisim": son - ilk, "degisim_yuzde": degisim_yuzde,
             "min_": seri.min(), "maks_": seri.max(), "hacim": son_hacim,
             "volatilite": yillik_vol, "seri": seri,
         })
-    satirlar.sort(key=lambda r: r["degisim_yuzde"], reverse=True)
-    inv2_watchlist_goster(satirlar, kolon_araligi_baslik=f"{periyot} Aralığı")
+    # Her sektör kendi başlığı ve kendi tablosuyla ayrı ayrı gösterilir
+    inv2_watchlist_sektorel_goster(satirlar, kolon_araligi_baslik=f"{periyot} Aralığı")
     st.caption("Dönem Aralığı çubuğu, son fiyatın seçilen dönemin en düşük–en yüksek bandı içindeki "
-               "konumunu gösterir; nokta sağa yakınsa fiyat dönem tepesine, sola yakınsa dibine yakındır.")
+               "konumunu gösterir; nokta sağa yakınsa fiyat dönem tepesine, sola yakınsa dibine yakındır. "
+               "Hisseler artık ait oldukları sektöre göre ayrı ayrı gruplanmış tablolarda listeleniyor.")
 
     st.markdown("---")
 
-    # --- Bazlanmış performans grafiği ---
     st.subheader("📊 Bazlanmış Performans Karşılaştırması")
     st.caption(f"Her hisse, seçilen {periyot} döneminin başında 100'e eşitlenmiştir — göreli performansı gösterir.")
     normalize = pd.DataFrame(index=df_fiyat.index)
@@ -1368,7 +1355,6 @@ ayrıca test edilir (bkz. Solvency II ve Stres Testi sayfaları).
 
     st.markdown("---")
 
-    # --- Korelasyon ısı haritası ---
     st.subheader("🔥 Günlük Getiri Korelasyon Matrisi")
     df_getiri = df_fiyat.pct_change().dropna()
     corr_matrix = df_getiri.corr()
@@ -1411,7 +1397,6 @@ ayrıca test edilir (bkz. Solvency II ve Stres Testi sayfaları).
 
     st.markdown("---")
 
-    # --- Volatilite karşılaştırması ---
     st.subheader("⚡ Yıllıklandırılmış Volatilite Karşılaştırması")
     egitim_notu("""
 Volatilite, günlük getirilerin standart sapmasının `√252` ile ölçeklenmesidir — bir hissenin
