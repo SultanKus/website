@@ -1257,6 +1257,62 @@ denir ve bu basit matris bunu yakalamaz. Kurumsal risk yönetiminde bu yüzden s
 ayrıca test edilir (bkz. Solvency II ve Stres Testi sayfaları).
 """)
 
+    # ---------------------------------------------------------
+    # OTOMATİK İZLEME LİSTESİ — sayfa açılır açılmaz, hiçbir seçim
+    # yapmadan Investing.com tarzı sektörel tablo kendiliğinden akar.
+    # ---------------------------------------------------------
+    ad_sozlugu_global = dict(BIST_POPULER)
+    st.markdown(
+        f'<div class="inv2-hdr-row"><h3 style="margin:0;">🧾 Piyasa İzleme Listesi</h3>'
+        f'<span class="inv2-count">{len(BIST_POPULER)} hisse · 6 Ay · Yahoo Finance</span></div>',
+        unsafe_allow_html=True
+    )
+    st.caption("Popüler BIST hisseleri sayfa açılır açılmaz otomatik yüklenir. Farklı hisselerle kendi "
+               "karşılaştırmanızı yapmak isterseniz aşağıdaki filtre panelinden seçim yapabilirsiniz.")
+    with st.spinner("Piyasa verileri çekiliyor..."):
+        _oto_semboller = [s for s, _ in BIST_POPULER]
+        df_oto_fiyat, df_oto_hacim = _coklu_hisse_kapanis_getir(tuple(_oto_semboller), "6mo")
+
+    if not df_oto_fiyat.empty:
+        oto_ticker_satirlari = []
+        for sembol in df_oto_fiyat.columns:
+            seri = df_oto_fiyat[sembol].dropna()
+            if len(seri) < 2 or seri.iloc[0] == 0:
+                continue
+            chg = (seri.iloc[-1] / seri.iloc[0] - 1) * 100
+            oto_ticker_satirlari.append((ad_sozlugu_global.get(sembol, sembol), seri.iloc[-1], chg, "", 2))
+        if oto_ticker_satirlari:
+            inv_ticker_goster(oto_ticker_satirlari)
+
+        oto_getiri_tum = df_oto_fiyat.pct_change().dropna()
+        oto_satirlar = []
+        for sembol in df_oto_fiyat.columns:
+            seri = df_oto_fiyat[sembol].dropna()
+            if len(seri) < 2:
+                continue
+            son, ilk = seri.iloc[-1], seri.iloc[0]
+            degisim_yuzde = (son / ilk - 1) * 100 if ilk else 0.0
+            getiri_serisi = oto_getiri_tum[sembol].dropna() if sembol in oto_getiri_tum.columns else pd.Series(dtype=float)
+            yillik_vol = getiri_serisi.std() * np.sqrt(252) * 100 if not getiri_serisi.empty else float("nan")
+            son_hacim = (df_oto_hacim[sembol].dropna().iloc[-1]
+                         if (not df_oto_hacim.empty and sembol in df_oto_hacim.columns and not df_oto_hacim[sembol].dropna().empty)
+                         else None)
+            oto_satirlar.append({
+                "ad": ad_sozlugu_global.get(sembol, sembol), "sembol": sembol,
+                "sektor": BIST_SEKTORU.get(sembol, "Diğer"),
+                "son": son, "degisim": son - ilk, "degisim_yuzde": degisim_yuzde,
+                "min_": seri.min(), "maks_": seri.max(), "hacim": son_hacim,
+                "volatilite": yillik_vol, "seri": seri,
+            })
+        inv2_watchlist_sektorel_goster(oto_satirlar, kolon_araligi_baslik="6 Ay Aralığı")
+    else:
+        st.warning("Piyasa verileri şu an çekilemiyor. İnternet bağlantınızı kontrol edin.")
+
+    st.markdown("---")
+    st.subheader("🔍 Kendi Karşılaştırmanızı Oluşturun")
+    st.caption("Yukarıdaki liste otomatik yüklenen tam listedir. İsterseniz belirli hisseleri seçip "
+               "korelasyon, bazlanmış performans ve volatilite analizlerini aşağıda çalıştırabilirsiniz.")
+
     ust_c1, ust_c2 = st.columns([3, 1])
     with ust_c2:
         periyot = st.selectbox("Periyot", ["6mo", "1y", "2y", "5y"], index=1, key="korr_periyot")
