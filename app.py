@@ -771,8 +771,7 @@ def ml_rehberi_sayfasi():
     st.header("Yöntem Notları")
     st.markdown("""
 Bu sayfa bir ders anlatımı değil; sitedeki modülleri kurarken hangi yöntemi neden seçtiğimin
-notları. Mülakatta "burada neden lojistik regresyon kullandın?" diye sorulduğunda vereceğim
-cevaplar da burada.
+notları — "burada neden lojistik regresyon kullandın?" gibi sorulara verdiğim gerekçeler de burada.
 """)
 
     st.subheader("Önce soru, sonra model")
@@ -1871,7 +1870,7 @@ türev ürün fiyatlamasının temel taşıdır.
 Brown hareketi** izlediğini (yani logaritmik getirilerin normal dağıldığını) varsayar; `N(d1)` ve `N(d2)`
 terimleri standart normal dağılımın kümülatif fonksiyonudur ve bu olasılıkları temsil eder.
 
-**Gerçekçi sınırlamalar (mülakatta sorulabilir):** Model sabit volatilite (`σ`) ve sabit faiz oranı varsayar;
+**Gerçekçi sınırlamalar:** Model sabit volatilite (`σ`) ve sabit faiz oranı varsayar;
 gerçek piyasalarda volatilite zamana ve strike'a göre değişir ("volatility smile/skew"), bu yüzden kurumsal
 masalarda Black-Scholes bir başlangıç noktasıdır, tek başına yeterli değildir.
 """)
