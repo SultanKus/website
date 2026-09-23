@@ -77,37 +77,50 @@ div[data-baseweb="popover"] li:hover { background-color: #e8f1fb !important; }
 </style>
 """, unsafe_allow_html=True)
 
-st.sidebar.markdown("""
-    <div style="display: flex; justify-content: center; gap: 25px; margin-top: 20px; margin-bottom: 20px;">
-        <a href="https://www.linkedin.com/in/sultan-kuş/" target="_blank" style="color: #0077b5; font-size: 32px; text-decoration: none;" title="LinkedIn">
-            <i class="fab fa-linkedin"></i>
-        </a>
-        <a href="https://github.com/SultanKus" target="_blank" style="color: #ffffff; font-size: 32px; text-decoration: none;" title="GitHub">
-            <i class="fab fa-github"></i>
-        </a>
-        <a href="mailto:kussultannn34@gmail.com" style="color: #ea4335; font-size: 32px; text-decoration: none;" title="Email Gönder">
-            <i class="fas fa-envelope"></i>
-        </a>
-    </div>
-    <hr style="border-top: 1px solid #ffffff; opacity: 0.2;">
-""", unsafe_allow_html=True)
+
 
 # ---------------------------------------------------------
 # VERİTABANI (SQLite)
 # ---------------------------------------------------------
+import smtplib
+from email.mime.text import MIMEText
+
+def bildirim_gonder(islem_tipi, detay):
+    try:
+        gonderen = st.secrets.get("EMAIL_ADRES", "")
+        sifre = st.secrets.get("EMAIL_SIFRE", "")
+        alici = st.secrets.get("ALICI_EMAIL", gonderen)
+        if not gonderen or not sifre:
+            return
+        msg = MIMEText(f"İşlem: {islem_tipi}\nDetay: {detay}\nZaman: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        msg['Subject'] = f"Sistem Bildirimi: {islem_tipi}"
+        msg['From'] = gonderen
+        msg['To'] = alici
+        
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as sunucu:
+            sunucu.login(gonderen, sifre)
+            sunucu.send_message(msg)
+    except Exception:
+        pass
+
 def veritabani_olustur():
     conn = sqlite3.connect('finansal_lab.db', check_same_thread=False)
     c = conn.cursor()
+    # Eski tablo yapısında kalanlar için önce temel tabloyu oluşturalım, ardından sütun ekleyelim
     c.execute("""
         CREATE TABLE IF NOT EXISTS simulasyonlar (
             id INTEGER PRIMARY KEY AUTOINCREMENT, 
-            kullanici TEXT, 
             tarih TEXT, 
             modul_adi TEXT, 
             girdi_detayi TEXT, 
             sonuc_deger TEXT
         )
     """)
+    try:
+        c.execute("ALTER TABLE simulasyonlar ADD COLUMN kullanici TEXT DEFAULT 'Misafir'")
+    except sqlite3.OperationalError:
+        pass # Zaten varsa hata verir, yoksayarız
+
     c.execute("""
         CREATE TABLE IF NOT EXISTS kullanicilar (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -136,6 +149,8 @@ def ziyaret_logla(islem_tipi, detay):
     c.execute("INSERT INTO ziyaretci_loglari (zaman, islem_tipi, detay) VALUES (?, ?, ?)", (zaman, islem_tipi, detay))
     conn.commit()
     conn.close()
+    # Bildirim Gönder (Eğer secrets tanımlıysa)
+    bildirim_gonder(islem_tipi, detay)
 
 def kayit_ekle(modul_adi, girdi_detayi, sonuc_deger):
     kullanici = st.session_state.get("aktif_kullanici", "Misafir")
@@ -214,6 +229,21 @@ else:
         ziyaret_logla("Çıkış", f"Kullanıcı çıkış yaptı: {st.session_state['aktif_kullanici']}")
         st.session_state["aktif_kullanici"] = None
         st.rerun()
+
+st.sidebar.markdown("""
+    <div style="display: flex; justify-content: center; gap: 25px; margin-top: 20px; margin-bottom: 20px;">
+        <a href="https://www.linkedin.com/in/sultan-kuş/" target="_blank" style="color: #0077b5; font-size: 32px; text-decoration: none;" title="LinkedIn">
+            <i class="fab fa-linkedin"></i>
+        </a>
+        <a href="https://github.com/SultanKus" target="_blank" style="color: #ffffff; font-size: 32px; text-decoration: none;" title="GitHub">
+            <i class="fab fa-github"></i>
+        </a>
+        <a href="mailto:kussultannn34@gmail.com" style="color: #ea4335; font-size: 32px; text-decoration: none;" title="Email Gönder">
+            <i class="fas fa-envelope"></i>
+        </a>
+    </div>
+    <hr style="border-top: 1px solid #ffffff; opacity: 0.2;">
+""", unsafe_allow_html=True)
 
 def model_rozeti(auc, f1, kaynak):
     st.markdown(
