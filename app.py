@@ -563,44 +563,68 @@ def hisse_secici(key_prefix, varsayilan="THYAO.IS"):
 
 
 # ---------------------------------------------------------
-# INVESTING.COM TARZI YOĞUN TABLO & TICKER BİLEŞENLERİ
+# INVESTING.COM TARZI İZLEME LİSTESİ (watchlist) BİLEŞENLERİ
 # ---------------------------------------------------------
 INV_CSS = """
 <style>
-.inv-ticker { white-space: nowrap; overflow: hidden; background:#0b1f33;
-              padding:9px 0; border-radius:6px; margin-bottom:16px; }
+/* --- üstteki ince akan şerit --- */
+.inv-ticker { white-space: nowrap; overflow: hidden; background:#0b1220;
+              padding:8px 0; border-radius:6px; margin-bottom:18px; }
 .inv-ticker-track { display:inline-block; padding-left:100%;
-                     animation: inv-scroll 32s linear infinite; }
+                     animation: inv-scroll 34s linear infinite; }
 .inv-ticker:hover .inv-ticker-track { animation-play-state: paused; }
 @keyframes inv-scroll { 0% { transform: translateX(0); } 100% { transform: translateX(-100%); } }
-.inv-ticker-item { display:inline-block; padding:0 26px; color:#dfe6ee !important;
-                    font-size:0.83rem; font-weight:600; border-right:1px solid rgba(255,255,255,0.12); }
-.inv-ticker-item b { color:#ffffff !important; font-weight:700; margin:0 5px; }
-.inv-up { color:#3ddc84 !important; font-weight:700; }
-.inv-down { color:#ff5c5c !important; font-weight:700; }
-.inv-table-wrap { overflow-x:auto; border:1px solid #e2e6ea; border-radius:8px; margin-bottom:8px; }
-table.inv-table { width:100%; border-collapse:collapse; font-size:0.86rem; background:#fff; }
-table.inv-table th { text-align:right; text-transform:uppercase; font-size:0.70rem; letter-spacing:0.5px;
-                      color:#5a6b7b !important; background:#f8f9fb; border-bottom:2px solid #e2e6ea;
-                      padding:9px 12px; white-space:nowrap; }
-table.inv-table th:first-child, table.inv-table td:first-child { text-align:left; }
-table.inv-table td { text-align:right; padding:9px 12px; border-bottom:1px solid #eef1f4;
-                      color:#0b1f33 !important; white-space:nowrap; font-variant-numeric: tabular-nums; }
-table.inv-table tbody tr:hover { background:#f5f8fb; }
-table.inv-table tbody tr:last-child td { border-bottom:none; }
-.inv-name-cell { font-weight:700 !important; }
-.inv-pos { color:#1e6b34 !important; font-weight:700; }
-.inv-neg { color:#b3261e !important; font-weight:700; }
-.inv-badge-pos { background:rgba(30,107,52,0.12); color:#1e6b34 !important;
-                 padding:3px 9px; border-radius:4px; font-weight:700; display:inline-block; }
-.inv-badge-neg { background:rgba(179,38,30,0.12); color:#b3261e !important;
-                 padding:3px 9px; border-radius:4px; font-weight:700; display:inline-block; }
+.inv-ticker-item { display:inline-block; padding:0 22px; color:#a9b4c0 !important;
+                    font-size:0.78rem; font-weight:600; border-right:1px solid rgba(255,255,255,0.08);
+                    font-variant-numeric: tabular-nums; }
+.inv-ticker-item b { color:#ffffff !important; font-weight:700; margin:0 6px; }
+.inv-up { color:#16c784 !important; font-weight:700; }
+.inv-down { color:#f0475c !important; font-weight:700; }
+
+/* --- büyük izleme listesi tablosu --- */
+.inv2-wrap { border:1px solid #e4e8ec; border-radius:10px; overflow-x:auto; overflow-y:hidden;
+             background:#ffffff; margin-bottom:6px; box-shadow:0 1px 2px rgba(11,31,51,0.04); }
+table.inv2-table { width:100%; border-collapse:collapse; font-size:0.865rem; min-width:900px; }
+table.inv2-table thead th { background:#f7f9fb; color:#7a8794 !important; text-transform:uppercase;
+                             font-size:0.66rem; letter-spacing:0.5px; font-weight:800;
+                             padding:11px 14px; border-bottom:1px solid #e4e8ec; white-space:nowrap; }
+table.inv2-table thead th:not(:first-child) { text-align:right; }
+table.inv2-table thead th:first-child { text-align:left; }
+table.inv2-table td { padding:10px 14px; border-bottom:1px solid #eef1f4; vertical-align:middle;
+                       white-space:nowrap; color:#0b1f33 !important; }
+table.inv2-table td:not(:first-child) { text-align:right; font-variant-numeric: tabular-nums; }
+table.inv2-table tbody tr:hover { background:#f6f9fc; }
+table.inv2-table tbody tr:last-child td { border-bottom:none; }
+.inv2-name-wrap { display:flex; align-items:center; gap:10px; }
+.inv2-dot { width:7px; height:7px; border-radius:50%; flex-shrink:0; }
+.inv2-name-txt { display:flex; flex-direction:column; line-height:1.25; }
+.inv2-name-txt b { font-size:0.885rem; color:#0b1f33 !important; font-weight:700; }
+.inv2-name-txt span { font-size:0.70rem; color:#98a3af !important; font-weight:600; }
+.inv2-chg-pos { color:#0f9d58 !important; font-weight:700; }
+.inv2-chg-neg { color:#e0323e !important; font-weight:700; }
+.inv2-pct { display:inline-block; padding:3px 10px; border-radius:5px; font-weight:700;
+            min-width:62px; font-size:0.82rem; }
+.inv2-pct-pos { background:rgba(15,157,88,0.10); color:#0f9d58 !important; }
+.inv2-pct-neg { background:rgba(224,50,62,0.10); color:#e0323e !important; }
+.inv2-range { width:104px; margin-left:auto; }
+.inv2-range-track { position:relative; width:100%; height:4px; background:#e7ebee; border-radius:2px; }
+.inv2-range-dot { position:absolute; top:50%; width:8px; height:8px; border-radius:50%;
+                   background:#0055a5; border:2px solid #fff; box-shadow:0 0 0 1px #cfd8e0;
+                   transform:translate(-50%, -50%); }
+.inv2-range-labels { display:flex; justify-content:space-between; font-size:0.66rem;
+                      color:#a4aeb8 !important; margin-top:3px; font-weight:600; }
+.inv2-spark-cell { line-height:0; }
+.inv2-hdr-row { display:flex; align-items:baseline; justify-content:space-between; margin-bottom:10px; }
+.inv2-hdr-row .inv2-count { font-size:0.8rem; color:#7a8794 !important; font-weight:600; }
 </style>
 """
 
+_INV2_RENKLER = ["#0055a5", "#7a4fd6", "#c9820a", "#0f9d58", "#c2364d",
+                  "#1b8fa0", "#8a5a00", "#4b5f7a", "#a0479a", "#2f7d3a"]
+
 
 def inv_ticker_goster(satirlar):
-    """satirlar: [(ad, deger, yuzde_degisim, birim, ondalik), ...] — Investing.com tarzı akan şerit."""
+    """satirlar: [(ad, deger, yuzde_degisim, birim, ondalik), ...] — üstteki ince akan şerit."""
     parcalar = []
     for ad, deger, chg, birim, ondalik in satirlar:
         pos = chg >= 0
@@ -615,13 +639,83 @@ def inv_ticker_goster(satirlar):
                 unsafe_allow_html=True)
 
 
-def inv_tablo_goster(basliklar, satirlar_html):
-    """basliklar: kolon adları listesi. satirlar_html: hazır <tr>...</tr> HTML string listesi."""
+def _inv2_spark_svg(seri, pos, w=104, h=34):
+    """Küçük, hafif bir alan (sparkline) grafiği — SVG olarak, plotly'siz. Investing.com'daki
+    mini grafik sütununun karşılığı; 60'tan fazla noktayı seyrekleştirir ki HTML şişmesin."""
+    deger = seri.dropna().values
+    if len(deger) < 2:
+        return '<span style="color:#c3cad1;">—</span>'
+    if len(deger) > 60:
+        idx = np.linspace(0, len(deger) - 1, 60).astype(int)
+        deger = deger[idx]
+    mn, mx = float(deger.min()), float(deger.max())
+    rng = (mx - mn) or 1.0
+    n = len(deger)
+    pts = [f"{(i / (n - 1)) * w:.1f},{h - ((v - mn) / rng) * (h - 4) - 2:.1f}" for i, v in enumerate(deger)]
+    cizgi = " ".join(pts)
+    renk = "#0f9d58" if pos else "#e0323e"
+    alan = f"0,{h} " + cizgi + f" {w},{h}"
+    return (f'<svg width="{w}" height="{h}" viewBox="0 0 {w} {h}" '
+            f'xmlns="http://www.w3.org/2000/svg" style="display:block;">'
+            f'<polyline points="{alan}" fill="{renk}20" stroke="none"/>'
+            f'<polyline points="{cizgi}" fill="none" stroke="{renk}" stroke-width="1.5" '
+            f'stroke-linecap="round" stroke-linejoin="round"/></svg>')
+
+
+def _inv2_hacim_metni(v):
+    if v is None or pd.isna(v) or v <= 0:
+        return "—"
+    if v >= 1_000_000_000:
+        return f"{v / 1_000_000_000:.2f}B".replace(".", ",")
+    if v >= 1_000_000:
+        return f"{v / 1_000_000:.2f}M".replace(".", ",")
+    if v >= 1_000:
+        return f"{v / 1_000:.1f}K".replace(".", ",")
+    return tr_sayi(v, 0)
+
+
+def inv2_watchlist_goster(satirlar, kolon_araligi_baslik="Dönem Aralığı"):
+    """satirlar: her biri dict — {ad, sembol, sektor, son, degisim, degisim_yuzde,
+    min_, maks_, hacim, seri (pd.Series), renk}. Investing.com ana sayfasındaki
+    büyük izleme listesi tablosunun karşılığı."""
+    satirlar_html = []
+    for i, r in enumerate(satirlar):
+        pos = r["degisim_yuzde"] >= 0
+        klas_chg = "inv2-chg-pos" if pos else "inv2-chg-neg"
+        klas_pct = "inv2-pct-pos" if pos else "inv2-pct-neg"
+        ok = "▲" if pos else "▼"
+        renk_dot = r.get("renk") or _INV2_RENKLER[i % len(_INV2_RENKLER)]
+
+        aralik = r["maks_"] - r["min_"] if r["maks_"] > r["min_"] else 1.0
+        konum = max(0.0, min(100.0, (r["son"] - r["min_"]) / aralik * 100))
+
+        satirlar_html.append(f"""
+        <tr>
+            <td>
+                <div class="inv2-name-wrap">
+                    <span class="inv2-dot" style="background:{renk_dot};"></span>
+                    <div class="inv2-name-txt"><b>{r['ad']}</b><span>{r.get('sektor', r['sembol'])}</span></div>
+                </div>
+            </td>
+            <td>{tr_sayi(r['son'], 2)}</td>
+            <td class="{klas_chg}">{'+' if pos else ''}{tr_sayi(r['degisim'], 2)}</td>
+            <td><span class="inv2-pct {klas_pct}">{ok} %{tr_sayi(abs(r['degisim_yuzde']), 2)}</span></td>
+            <td>
+                <div class="inv2-range">
+                    <div class="inv2-range-track"><div class="inv2-range-dot" style="left:{konum:.1f}%;"></div></div>
+                    <div class="inv2-range-labels"><span>{tr_sayi(r['min_'], 2)}</span><span>{tr_sayi(r['maks_'], 2)}</span></div>
+                </div>
+            </td>
+            <td>{_inv2_hacim_metni(r.get('hacim'))}</td>
+            <td>{'—' if pd.isna(r.get('volatilite', np.nan)) else f"%{tr_sayi(r['volatilite'], 1)}"}</td>
+            <td class="inv2-spark-cell">{_inv2_spark_svg(r['seri'], pos)}</td>
+        </tr>""")
+
+    basliklar = ["Hisse", "Son", "Değişim", "Değişim %", kolon_araligi_baslik, "Hacim", "Yıllık Vol.", "Grafik"]
     th = "".join(f"<th>{b}</th>" for b in basliklar)
-    gövde = "".join(satirlar_html)
     st.markdown(
-        f'<div class="inv-table-wrap"><table class="inv-table"><thead><tr>{th}</tr></thead>'
-        f'<tbody>{gövde}</tbody></table></div>',
+        f'<div class="inv2-wrap"><table class="inv2-table"><thead><tr>{th}</tr></thead>'
+        f'<tbody>{"".join(satirlar_html)}</tbody></table></div>',
         unsafe_allow_html=True
     )
 
@@ -1117,22 +1211,29 @@ tam olarak kendisidir — yani buradaki teknik panel ile kantitatif modüller ay
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def _coklu_hisse_kapanis_getir(hisseler, periyot):
-    """Birden çok sembolün kapanış fiyatlarını TEK yfinance çağrısıyla indirir."""
+    """Birden çok sembolün kapanış fiyatı VE hacmini TEK yfinance çağrısıyla indirir.
+    (kapanis_df, hacim_df) döner — watchlist tablosundaki Hacim sütunu için."""
     hisseler = list(hisseler)
     ham = yf.download(hisseler, period=periyot, progress=False, auto_adjust=True, threads=True)
     if ham is None or ham.empty:
-        return pd.DataFrame()
+        return pd.DataFrame(), pd.DataFrame()
     if isinstance(ham.columns, pd.MultiIndex):
         kapanis = ham["Close"].copy()
+        hacim = ham["Volume"].copy() if "Volume" in ham.columns.get_level_values(0) else pd.DataFrame()
     else:
         kapanis = ham[["Close"]].copy()
         kapanis.columns = hisseler[:1]
+        hacim = ham[["Volume"]].copy() if "Volume" in ham.columns else pd.DataFrame()
+        if not hacim.empty:
+            hacim.columns = hisseler[:1]
     try:
         if getattr(kapanis.index, "tz", None) is not None:
             kapanis.index = kapanis.index.tz_localize(None)
+            if not hacim.empty:
+                hacim.index = hacim.index.tz_localize(None)
     except (TypeError, AttributeError):
         pass
-    return kapanis.dropna(how="all")
+    return kapanis.dropna(how="all"), hacim
 
 
 def veri_analizi_sayfasi():
@@ -1188,7 +1289,7 @@ ayrıca test edilir (bkz. Solvency II ve Stres Testi sayfaları).
         return
 
     with st.spinner("Hisse verileri indiriliyor..."):
-        df_fiyat = _coklu_hisse_kapanis_getir(tuple(hisse_listesi), periyot)
+        df_fiyat, df_hacim = _coklu_hisse_kapanis_getir(tuple(hisse_listesi), periyot)
 
     if df_fiyat.empty:
         st.error("Hiçbir sembol için veri bulunamadı.")
@@ -1205,9 +1306,9 @@ ayrıca test edilir (bkz. Solvency II ve Stres Testi sayfaları).
 
     ad_sozlugu = dict(BIST_POPULER)
     df_getiri_tum = df_fiyat.pct_change().dropna()
-
-    # --- Akan şerit: seçilen hisseler, dönem başından bugüne değişim ---
     hisseler = list(df_fiyat.columns)
+
+    # --- Üstte ince akan şerit ---
     ticker_satirlari = []
     for sembol in hisseler:
         seri = df_fiyat[sembol].dropna()
@@ -1218,38 +1319,35 @@ ayrıca test edilir (bkz. Solvency II ve Stres Testi sayfaları).
     if ticker_satirlari:
         inv_ticker_goster(ticker_satirlari)
 
-    # --- Yoğun izleme listesi tablosu ---
-    st.subheader("🧾 Seçilen Hisseler — İzleme Listesi")
-    satirlar_html = []
+    # --- BÜYÜK İZLEME LİSTESİ TABLOSU (Investing.com tarzı) ---
+    st.markdown(
+        f'<div class="inv2-hdr-row"><h3 style="margin:0;">🧾 İzleme Listesi</h3>'
+        f'<span class="inv2-count">{len(hisseler)} hisse · {periyot} · Yahoo Finance</span></div>',
+        unsafe_allow_html=True
+    )
+    satirlar = []
     for sembol in hisseler:
         seri = df_fiyat[sembol].dropna()
         if len(seri) < 2:
             continue
         son, ilk = seri.iloc[-1], seri.iloc[0]
-        degisim_mutlak = son - ilk
         degisim_yuzde = (son / ilk - 1) * 100 if ilk else 0.0
-        yuksek, dusuk = seri.max(), seri.min()
         getiri_serisi = df_getiri_tum[sembol].dropna() if sembol in df_getiri_tum.columns else pd.Series(dtype=float)
         yillik_vol = getiri_serisi.std() * np.sqrt(252) * 100 if not getiri_serisi.empty else float("nan")
-        pos = degisim_yuzde >= 0
-        klas = "inv-pos" if pos else "inv-neg"
-        rozet = "inv-badge-pos" if pos else "inv-badge-neg"
-        ok = "▲" if pos else "▼"
-        vol_metin = "—" if pd.isna(yillik_vol) else f"%{tr_sayi(yillik_vol, 1)}"
-        satirlar_html.append(f"""
-        <tr>
-            <td class="inv-name-cell">{ad_sozlugu.get(sembol, sembol)}</td>
-            <td>{tr_sayi(son, 2)}</td>
-            <td class="{klas}">{'+' if pos else ''}{tr_sayi(degisim_mutlak, 2)}</td>
-            <td><span class="{rozet}">{ok} %{tr_sayi(abs(degisim_yuzde), 2)}</span></td>
-            <td>{tr_sayi(yuksek, 2)}</td>
-            <td>{tr_sayi(dusuk, 2)}</td>
-            <td>{vol_metin}</td>
-        </tr>""")
-    inv_tablo_goster(
-        ["Hisse", "Son", "Değişim", "Değişim %", f"{periyot} Yüksek", f"{periyot} Düşük", "Yıllık Volatilite"],
-        satirlar_html
-    )
+        son_hacim = (df_hacim[sembol].dropna().iloc[-1]
+                     if (not df_hacim.empty and sembol in df_hacim.columns and not df_hacim[sembol].dropna().empty)
+                     else None)
+        satirlar.append({
+            "ad": ad_sozlugu.get(sembol, sembol), "sembol": sembol,
+            "sektor": BIST_SEKTORU.get(sembol, sembol),
+            "son": son, "degisim": son - ilk, "degisim_yuzde": degisim_yuzde,
+            "min_": seri.min(), "maks_": seri.max(), "hacim": son_hacim,
+            "volatilite": yillik_vol, "seri": seri,
+        })
+    satirlar.sort(key=lambda r: r["degisim_yuzde"], reverse=True)
+    inv2_watchlist_goster(satirlar, kolon_araligi_baslik=f"{periyot} Aralığı")
+    st.caption("Dönem Aralığı çubuğu, son fiyatın seçilen dönemin en düşük–en yüksek bandı içindeki "
+               "konumunu gösterir; nokta sağa yakınsa fiyat dönem tepesine, sola yakınsa dibine yakındır.")
 
     st.markdown("---")
 
