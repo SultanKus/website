@@ -9,6 +9,7 @@ from sklearn.linear_model import PoissonRegressor, LogisticRegression
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import roc_auc_score, f1_score, mean_poisson_deviance
 import sqlite3
+import os
 from datetime import datetime
 import yfinance as yf
 import requests
@@ -97,29 +98,122 @@ st.sidebar.markdown("""
 def veritabani_olustur():
     conn = sqlite3.connect('finansal_lab.db', check_same_thread=False)
     c = conn.cursor()
-    c.execute('''
+    c.execute("""
         CREATE TABLE IF NOT EXISTS simulasyonlar (
-            id INTEGER PRIMARY KEY AUTOINCREMENT, tarih TEXT, modul_adi TEXT, girdi_detayi TEXT, sonuc_deger TEXT)
-    ''')
+            id INTEGER PRIMARY KEY AUTOINCREMENT, 
+            kullanici TEXT, 
+            tarih TEXT, 
+            modul_adi TEXT, 
+            girdi_detayi TEXT, 
+            sonuc_deger TEXT
+        )
+    """)
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS kullanicilar (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            kullanici_adi TEXT UNIQUE,
+            sifre TEXT,
+            kayit_tarihi TEXT
+        )
+    """)
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS ziyaretci_loglari (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            zaman TEXT,
+            islem_tipi TEXT,
+            detay TEXT
+        )
+    """)
     conn.commit()
     conn.close()
 
 veritabani_olustur()
 
+def ziyaret_logla(islem_tipi, detay):
+    conn = sqlite3.connect('finansal_lab.db', check_same_thread=False)
+    c = conn.cursor()
+    zaman = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    c.execute("INSERT INTO ziyaretci_loglari (zaman, islem_tipi, detay) VALUES (?, ?, ?)", (zaman, islem_tipi, detay))
+    conn.commit()
+    conn.close()
+
 def kayit_ekle(modul_adi, girdi_detayi, sonuc_deger):
+    kullanici = st.session_state.get("aktif_kullanici", "Misafir")
     conn = sqlite3.connect('finansal_lab.db', check_same_thread=False)
     c = conn.cursor()
     tarih = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    c.execute("INSERT INTO simulasyonlar (tarih, modul_adi, girdi_detayi, sonuc_deger) VALUES (?, ?, ?, ?)",
-              (tarih, modul_adi, girdi_detayi, sonuc_deger))
+    c.execute("INSERT INTO simulasyonlar (kullanici, tarih, modul_adi, girdi_detayi, sonuc_deger) VALUES (?, ?, ?, ?, ?)",
+              (kullanici, tarih, modul_adi, girdi_detayi, sonuc_deger))
     conn.commit()
     conn.close()
+
+def kullanici_gecmisi_getir():
+    kullanici = st.session_state.get("aktif_kullanici", "Misafir")
+    conn = sqlite3.connect('finansal_lab.db', check_same_thread=False)
+    df = pd.read_sql("SELECT tarih, modul_adi, girdi_detayi, sonuc_deger FROM simulasyonlar WHERE kullanici = ? ORDER BY id DESC", conn, params=(kullanici,))
+    conn.close()
+    return df
+
+def tum_loglari_getir():
+    conn = sqlite3.connect('finansal_lab.db', check_same_thread=False)
+    df_sim = pd.read_sql("SELECT * FROM simulasyonlar ORDER BY id DESC", conn)
+    df_log = pd.read_sql("SELECT * FROM ziyaretci_loglari ORDER BY id DESC", conn)
+    df_user = pd.read_sql("SELECT * FROM kullanicilar ORDER BY id DESC", conn)
+    conn.close()
+    return df_sim, df_log, df_user
 
 def gecmisi_getir():
     conn = sqlite3.connect('finansal_lab.db', check_same_thread=False)
     df = pd.read_sql("SELECT * FROM simulasyonlar ORDER BY id DESC", conn)
     conn.close()
     return df
+
+# --- SIDEBAR KULLANICI GİRİŞ & ÜYELİK PANELİ ---
+if "aktif_kullanici" not in st.session_state:
+    st.session_state["aktif_kullanici"] = None
+
+st.sidebar.markdown("---")
+st.sidebar.subheader("👤 Kullanıcı Paneli")
+
+if st.session_state["aktif_kullanici"] is None:
+    islem = st.sidebar.radio("İşlem Seçin", ["Giriş Yap", "Üye Ol"], horizontal=True, key="auth_radio")
+    k_adi = st.sidebar.text_input("Kullanıcı Adı", key="sidebar_k_adi")
+    sifre = st.sidebar.text_input("Şifre", type="password", key="sidebar_sifre")
+
+    if islem == "Üye Ol":
+        if st.sidebar.button("Kayıt Ol"):
+            if k_adi and sifre:
+                try:
+                    conn = sqlite3.connect('finansal_lab.db', check_same_thread=False)
+                    c = conn.cursor()
+                    c.execute("INSERT INTO kullanicilar (kullanici_adi, sifre, kayit_tarihi) VALUES (?, ?, ?)",
+                              (k_adi, sifre, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+                    conn.commit()
+                    conn.close()
+                    ziyaret_logla("Yeni Üye", f"Kullanıcı kayıt oldu: {k_adi}")
+                    st.sidebar.success("Kayıt başarılı! Şimdi giriş yapabilirsiniz.")
+                except Exception:
+                    st.sidebar.error("Bu kullanıcı adı zaten alınmış.")
+            else:
+                st.sidebar.warning("Tüm alanları doldurun.")
+    else:
+        if st.sidebar.button("Giriş Yap"):
+            conn = sqlite3.connect('finansal_lab.db', check_same_thread=False)
+            df_u = pd.read_sql("SELECT * FROM kullanicilar WHERE kullanici_adi = ? AND sifre = ?", conn, params=(k_adi, sifre))
+            conn.close()
+            if not df_u.empty:
+                st.session_state["aktif_kullanici"] = k_adi
+                ziyaret_logla("Giriş", f"Kullanıcı giriş yaptı: {k_adi}")
+                st.sidebar.success(f"Hoş geldin, {k_adi}!")
+                st.rerun()
+            else:
+                st.sidebar.error("Hatalı kullanıcı adı veya şifre.")
+else:
+    st.sidebar.success(f"Oturum Açık: **{st.session_state['aktif_kullanici']}**")
+    if st.sidebar.button("Çıkış Yap"):
+        ziyaret_logla("Çıkış", f"Kullanıcı çıkış yaptı: {st.session_state['aktif_kullanici']}")
+        st.session_state["aktif_kullanici"] = None
+        st.rerun()
 
 def model_rozeti(auc, f1, kaynak):
     st.markdown(
@@ -2268,26 +2362,68 @@ genelde birlikte çalışır.
 # SİSTEM & İLETİŞİM
 # ---------------------------------------------------------
 def veritabani_sayfasi():
-    st.header("SQLite Veritabanı Geçmişi")
-    st.info("Not: Streamlit Cloud gibi ephemeral (geçici) barındırmalarda bu veritabanı her yeniden dağıtımda sıfırlanır.")
-    st.dataframe(gecmisi_getir(), width='stretch')
+    st.header("📂 Veritabanı & Geçmiş Paneli")
+    aktif = st.session_state.get("aktif_kullanici", None)
+    
+    if aktif is None:
+        st.info("🔒 Kendi geçmiş simülasyonlarınızı görmek için lütfen sol menüden giriş yapın.")
+    else:
+        st.subheader(f"✨ {aktif} - Kişisel Simülasyon Geçmişiniz")
+        df_kisi = kullanici_gecmisi_getir()
+        if not df_kisi.empty:
+            st.dataframe(df_kisi, width='stretch')
+        else:
+            st.markdown("Henüz kayıtlı bir simülasyonunuz yok. Modüllerde işlem yaptıkça burada listelenecektir.")
+            
+    st.markdown("---")
+    st.subheader("🕵️ Sistem Sahibi / Ziyaretçi Takip Paneli")
+    yonetici_sifresi = st.secrets.get("YONETICI_SIFRE", "sultan123")
+    girilen_sifre = st.text_input("Yönetici Şifresi (Sadece sizin erişiminiz için)", type="password", key="admin_sifre_giris")
+    
+    if girilen_sifre == yonetici_sifresi:
+        st.success("🔓 Yönetici yetkisi doğrulandı. Ziyaretçi ve sistem logları yükleniyor...")
+        df_sim, df_log, df_user = tum_loglari_getir()
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Toplam Üye Sayısı", len(df_user))
+        col2.metric("Toplam Simülasyon", len(df_sim))
+        col3.metric("Toplam Ziyaret/İşlem Logu", len(df_log))
+        
+        st.markdown("#### 👥 Kayıtlı Üyeler")
+        st.dataframe(df_user, width='stretch')
+        st.markdown("#### 📈 Ziyaret ve Etkileşim Logları")
+        st.dataframe(df_log, width='stretch')
+        st.markdown("#### 🌐 Tüm Kullanıcıların Simülasyon Geçmişi")
+        st.dataframe(df_sim, width='stretch')
+    elif girilen_sifre != "":
+        st.error("Hatalı yönetici şifresi!")
 
 def hakkinda_sayfasi():
     st.header("Proje Sahibi & Portfolyo Vitrini")
     col1, col2 = st.columns([1, 3])
     with col1:
-        st.image("https://cdn-icons-png.flaticon.com/512/3135/3135715.png", width=180)
+        if os.path.exists("profil.jpg"):
+            st.image("profil.jpg", width=180, caption="Sultan Kuş")
+        elif os.path.exists("profil.png"):
+            st.image("profil.png", width=180, caption="Sultan Kuş")
+        else:
+            st.image("https://cdn-icons-png.flaticon.com/512/2922/2922561.png", width=180, caption="Sultan Kuş")
+            
     with col2:
         st.markdown("""
         Merhaba! Ben **Sultan Kuş**.
         Matematik altyapımla finans, sigorta ve risk analitiği alanlarına yönelik veri bilimi çözümleri geliştiriyorum.
         Hedefim; finans, sigorta ve **katılım bankacılığı** alanlarında, matematiksel titizliği veri bilimiyle
         birleştiren bir rol.
+        """, unsafe_allow_html=True)
+        
+        st.markdown("""
+        <div style="margin-top: 15px; line-height: 2.2;">
+            <i class="fas fa-envelope" style="color: #ea4335; font-size: 18px; width: 25px;"></i> <b>Email:</b> <a href="mailto:kussultannn34@gmail.com" style="text-decoration: none; color: #0055a5;">kussultannn34@gmail.com</a><br>
+            <i class="fab fa-linkedin" style="color: #0077b5; font-size: 18px; width: 25px;"></i> <b>LinkedIn:</b> <a href="https://www.linkedin.com/in/sultan-kuş/" target="_blank" style="text-decoration: none; color: #0055a5;">linkedin.com/in/sultan-kuş</a><br>
+            <i class="fab fa-github" style="color: #24292e; font-size: 18px; width: 25px;"></i> <b>GitHub:</b> <a href="https://github.com/SultanKus" target="_blank" style="text-decoration: none; color: #0055a5;">github.com/SultanKus</a>
+        </div>
+        """, unsafe_allow_html=True)
 
-        * **📧 Email:** [kussultannn34@gmail.com](mailto:kussultannn34@gmail.com)
-        * **💼 LinkedIn:** [linkedin.com/in/sultan-kuş](https://www.linkedin.com/in/sultan-kuş/)
-        * **💻 GitHub:** [github.com/SultanKus](https://github.com/SultanKus)
-        """)
     st.markdown("---")
     st.subheader("🎯 Yetkinlik Haritası")
     st.markdown("""
@@ -2301,12 +2437,13 @@ def hakkinda_sayfasi():
 """)
     st.caption("Bu tablo, proje boyunca fiilen uygulanan yöntemlere dayanır — her satır, sitedeki ilgili modülle doğrulanabilir.")
     st.markdown("---")
+    
     st.subheader("📄 Özgeçmiş (CV)")
     try:
         with open("Sultan_Kus_CV.pdf", "rb") as pdf_file:
-            st.download_button(label="Özgeçmişimi İndir (PDF)", data=pdf_file, file_name="Sultan_Kus_CV.pdf", mime="application/pdf")
+            st.download_button(label="📥 Özgeçmişimi İndir (PDF)", data=pdf_file, file_name="Sultan_Kus_CV.pdf", mime="application/pdf")
     except FileNotFoundError:
-        st.warning("⚠️ 'Sultan_Kus_CV.pdf' dosyası proje klasöründe bulunamadı.")
+        st.info("💡 GitHub deponuza 'Sultan_Kus_CV.pdf' adlı dosyanızı yüklediğinizde indirme butonu ziyaretçiler için otomatik aktif olacaktır.")
 
 # ---------------------------------------------------------
 # NAVİGASYON
