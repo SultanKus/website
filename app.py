@@ -84,6 +84,24 @@ div[data-baseweb="popover"] li:hover { background-color: #e8f1fb !important; }
 # ---------------------------------------------------------
 import smtplib
 from email.mime.text import MIMEText
+import hashlib
+
+def sifre_hashle(sifre, tuz_hex=None):
+    """Şifreyi rastgele bir tuz (salt) ile PBKDF2-SHA256 kullanarak hash'ler.
+    Dönen değer 'tuz$hash' formatındadır, veritabanına bu haliyle yazılır."""
+    if tuz_hex is None:
+        tuz_hex = os.urandom(16).hex()
+    hash_deger = hashlib.pbkdf2_hmac('sha256', sifre.encode('utf-8'), bytes.fromhex(tuz_hex), 100_000).hex()
+    return f"{tuz_hex}${hash_deger}"
+
+def sifre_dogrula(girilen_sifre, saklanan_deger):
+    """Girilen şifreyi veritabanındaki değerle karşılaştırır.
+    Eski (hash'lenmemiş, düz metin) hesaplarla da geriye dönük uyumludur."""
+    if saklanan_deger and "$" in saklanan_deger:
+        tuz_hex, _ = saklanan_deger.split("$", 1)
+        return sifre_hashle(girilen_sifre, tuz_hex) == saklanan_deger
+    # Eski kayıtlar düz metin olarak saklanmıştı; düz karşılaştırma yapıyoruz.
+    return girilen_sifre == saklanan_deger
 
 def _email_hata_logla(mesaj):
     """Mail gönderiminde oluşan hatayı sessizce yutmak yerine loglara yazar
@@ -202,6 +220,17 @@ def gecmisi_getir():
 if "aktif_kullanici" not in st.session_state:
     st.session_state["aktif_kullanici"] = None
 
+# Bir ziyaretçi siteye girdiğinde (oturum başına sadece 1 kez) bildirim gönder.
+# Aynı sekmede buton tıklayıp sayfa yenilendikçe tekrar tekrar göndermesin diye
+# bu bayrağı kullanıyoruz.
+if "ziyaret_bildirimi_gonderildi" not in st.session_state:
+    st.session_state["ziyaret_bildirimi_gonderildi"] = True
+    try:
+        sayfa_adi = st.query_params.get("page", "Bilinmiyor")
+    except Exception:
+        sayfa_adi = "Bilinmiyor"
+    ziyaret_logla("Site Ziyareti", f"Bir ziyaretçi siteye girdi. (sayfa: {sayfa_adi})")
+
 st.sidebar.markdown("---")
 st.sidebar.subheader("👤 Kullanıcı Paneli")
 
@@ -217,7 +246,7 @@ if st.session_state["aktif_kullanici"] is None:
                     conn = sqlite3.connect('finansal_lab.db', check_same_thread=False)
                     c = conn.cursor()
                     c.execute("INSERT INTO kullanicilar (kullanici_adi, sifre, kayit_tarihi) VALUES (?, ?, ?)",
-                              (k_adi, sifre, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+                              (k_adi, sifre_hashle(sifre), datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
                     conn.commit()
                     conn.close()
                     ziyaret_logla("Yeni Üye", f"Kullanıcı kayıt oldu: {k_adi}")
@@ -229,14 +258,21 @@ if st.session_state["aktif_kullanici"] is None:
     else:
         if st.sidebar.button("Giriş Yap"):
             conn = sqlite3.connect('finansal_lab.db', check_same_thread=False)
-            df_u = pd.read_sql("SELECT * FROM kullanicilar WHERE kullanici_adi = ? AND sifre = ?", conn, params=(k_adi, sifre))
-            conn.close()
-            if not df_u.empty:
+            df_u = pd.read_sql("SELECT * FROM kullanicilar WHERE kullanici_adi = ?", conn, params=(k_adi,))
+            if not df_u.empty and sifre_dogrula(sifre, df_u.iloc[0]["sifre"]):
+                # Eski (düz metin) hesapsa, artık hash'lenmiş haliyle güncelle.
+                if "$" not in str(df_u.iloc[0]["sifre"]):
+                    c = conn.cursor()
+                    c.execute("UPDATE kullanicilar SET sifre = ? WHERE kullanici_adi = ?",
+                              (sifre_hashle(sifre), k_adi))
+                    conn.commit()
+                conn.close()
                 st.session_state["aktif_kullanici"] = k_adi
                 ziyaret_logla("Giriş", f"Kullanıcı giriş yaptı: {k_adi}")
                 st.sidebar.success(f"Hoş geldin, {k_adi}!")
                 st.rerun()
             else:
+                conn.close()
                 st.sidebar.error("Hatalı kullanıcı adı veya şifre.")
 else:
     st.sidebar.success(f"Oturum Açık: **{st.session_state['aktif_kullanici']}**")
@@ -2443,7 +2479,7 @@ def veritabani_sayfasi():
         col3.metric("Toplam Ziyaret/İşlem Logu", len(df_log))
         
         st.markdown("#### 👥 Kayıtlı Üyeler")
-        st.dataframe(df_user, width='stretch')
+        st.dataframe(df_user.drop(columns=["sifre"], errors="ignore"), width='stretch')
         st.markdown("#### 📈 Ziyaret ve Etkileşim Logları")
         st.dataframe(df_log, width='stretch')
         st.markdown("#### 🌐 Tüm Kullanıcıların Simülasyon Geçmişi")
