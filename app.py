@@ -85,12 +85,27 @@ div[data-baseweb="popover"] li:hover { background-color: #e8f1fb !important; }
 import smtplib
 from email.mime.text import MIMEText
 
+def _email_hata_logla(mesaj):
+    """Mail gönderiminde oluşan hatayı sessizce yutmak yerine loglara yazar
+    ki Yönetici panelinden ('Ziyaret ve Etkileşim Logları') görülebilsin."""
+    try:
+        conn = sqlite3.connect('finansal_lab.db', check_same_thread=False)
+        c = conn.cursor()
+        zaman = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        c.execute("INSERT INTO ziyaretci_loglari (zaman, islem_tipi, detay) VALUES (?, ?, ?)",
+                  (zaman, "⚠️ Email Hatası", mesaj))
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
+
 def bildirim_gonder(islem_tipi, detay):
     try:
         gonderen = st.secrets.get("EMAIL_ADRES", "")
         sifre = st.secrets.get("EMAIL_SIFRE", "")
         alici = st.secrets.get("ALICI_EMAIL", gonderen)
         if not gonderen or not sifre:
+            _email_hata_logla("EMAIL_ADRES veya EMAIL_SIFRE secrets içinde tanımlı değil (secrets.toml / Streamlit Cloud Secrets).")
             return
         msg = MIMEText(f"İşlem: {islem_tipi}\nDetay: {detay}\nZaman: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         msg['Subject'] = f"Sistem Bildirimi: {islem_tipi}"
@@ -100,8 +115,8 @@ def bildirim_gonder(islem_tipi, detay):
         with smtplib.SMTP_SSL("smtp.gmail.com", 465) as sunucu:
             sunucu.login(gonderen, sifre)
             sunucu.send_message(msg)
-    except Exception:
-        pass
+    except Exception as e:
+        _email_hata_logla(f"{type(e).__name__}: {e}")
 
 def veritabani_olustur():
     conn = sqlite3.connect('finansal_lab.db', check_same_thread=False)
@@ -2412,6 +2427,15 @@ def veritabani_sayfasi():
     
     if girilen_sifre == yonetici_sifresi:
         st.success("🔓 Yönetici yetkisi doğrulandı. Ziyaretçi ve sistem logları yükleniyor...")
+
+        gonderen_kontrol = st.secrets.get("EMAIL_ADRES", "")
+        sifre_kontrol = st.secrets.get("EMAIL_SIFRE", "")
+        if not gonderen_kontrol or not sifre_kontrol:
+            st.warning("📭 EMAIL_ADRES / EMAIL_SIFRE secrets içinde tanımlı değil — bu yüzden bildirim maili gitmiyor. "
+                       ".streamlit/secrets.toml dosyasına veya Streamlit Cloud > App Settings > Secrets kısmına ekleyin.")
+        else:
+            st.caption(f"📧 Email bildirimi: {gonderen_kontrol} → {st.secrets.get('ALICI_EMAIL', gonderen_kontrol)} (secrets tanımlı)")
+
         df_sim, df_log, df_user = tum_loglari_getir()
         col1, col2, col3 = st.columns(3)
         col1.metric("Toplam Üye Sayısı", len(df_user))
