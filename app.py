@@ -2463,10 +2463,10 @@ genelde birlikte çalışır.
 # ---------------------------------------------------------
 # SİSTEM & İLETİŞİM
 # ---------------------------------------------------------
-def veritabani_sayfasi():
-    st.header("📂 Veritabanı & Geçmiş Paneli")
+def kisisel_gecmis_sayfasi():
+    st.header("🗂️ Kişisel Simülasyon Geçmişim")
     aktif = st.session_state.get("aktif_kullanici", None)
-    
+
     if aktif is None:
         st.info("🔒 Kendi geçmiş simülasyonlarınızı görmek için lütfen sol menüden giriş yapın.")
     else:
@@ -2476,9 +2476,9 @@ def veritabani_sayfasi():
             st.dataframe(df_kisi, width='stretch')
         else:
             st.markdown("Henüz kayıtlı bir simülasyonunuz yok. Modüllerde işlem yaptıkça burada listelenecektir.")
-            
-    st.markdown("---")
-    st.subheader("🕵️ Sistem Sahibi / Ziyaretçi Takip Paneli")
+
+def veritabani_sayfasi():
+    st.header("🕵️ Sistem Sahibi / Ziyaretçi Takip Paneli")
     yonetici_sifresi = st.secrets.get("YONETICI_SIFRE", "sultan123")
     girilen_sifre = st.text_input("Yönetici Şifresi (Sadece sizin erişiminiz için)", type="password", key="admin_sifre_giris")
     
@@ -2564,9 +2564,12 @@ def hakkinda_sayfasi():
 # menüye ancak SEN kendi üye hesabınla giriş yaptığında ekleniyor.
 # Secrets'a ADMIN_KULLANICI_ADI olarak kendi kullanıcı adını yazman yeterli.
 _admin_kullanici_adi = st.secrets.get("ADMIN_KULLANICI_ADI", "")
-_sistem_sayfalari = [st.Page(hakkinda_sayfasi, title="Hakkımda & İletişim", icon="👩‍💻")]
+_sistem_sayfalari = [
+    st.Page(kisisel_gecmis_sayfasi, title="Kişisel Geçmişim", icon="🗂️"),
+    st.Page(hakkinda_sayfasi, title="Hakkımda & İletişim", icon="👩‍💻"),
+]
 if _admin_kullanici_adi and st.session_state.get("aktif_kullanici") == _admin_kullanici_adi:
-    _sistem_sayfalari.insert(0, st.Page(veritabani_sayfasi, title="Veritabanı Geçmişi", icon="📂"))
+    _sistem_sayfalari.insert(0, st.Page(veritabani_sayfasi, title="Veritabanı Geçmişi (Yönetici)", icon="📂"))
 
 pg = st.navigation({
     "Genel Bakış & Canlı Piyasa": [
