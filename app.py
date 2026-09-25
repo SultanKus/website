@@ -418,7 +418,8 @@ def kredi_risk_modelini_egit():
             if kolon not in X.columns:
                 raise KeyError(f"Beklenen sütun bulunamadı: {kolon}")
         return {"tip": "gercek", "model": model, "kolonlar": X.columns, "varsayilan": X.median(),
-                "auc": auc, "f1": f1, "kaynak": "OpenML German Credit (credit-g)"}
+                "auc": auc, "f1": f1, "kaynak": "OpenML German Credit (credit-g)",
+                "y_test": y_test.reset_index(drop=True), "y_prob_test": y_prob}
     except Exception:
         df = _sentetik_veri_kredi()
         X, y = df.drop(columns=['hedef']), df['hedef']
@@ -429,7 +430,8 @@ def kredi_risk_modelini_egit():
         auc = roc_auc_score(y_test, y_prob)
         f1 = f1_score(y_test, (y_prob > 0.5).astype(int))
         return {"tip": "sentetik", "model": model, "auc": auc, "f1": f1,
-                "kaynak": "Sentetik veri (gerçek veri setine erişilemedi)"}
+                "kaynak": "Sentetik veri (gerçek veri setine erişilemedi)",
+                "y_test": y_test.reset_index(drop=True), "y_prob_test": y_prob}
 
 @st.cache_resource
 def churn_modelini_egit():
@@ -1776,34 +1778,122 @@ anlamsız olduğu için ikisini birlikte veriyorum, ikisi de test kümesinden.
     sonuc = kredi_risk_modelini_egit()
     model_rozeti(sonuc['auc'], sonuc['f1'], sonuc['kaynak'])
 
-    if sonuc['tip'] == 'gercek':
+    t1, t2, t3 = st.tabs(["🎯 Skorlama", "⚖️ Eşik (Cut-off) Analizi", "📋 Scorecard & Beklenen Kayıp"])
+
+    with t1:
+        if sonuc['tip'] == 'gercek':
+            c1, c2 = st.columns(2)
+            with c1:
+                yas = st.slider("Yaş", 18, 75, 35)
+                sure_ay = st.slider("Kredi Vadesi (Ay)", 6, 72, 24)
+            with c2:
+                tutar = st.number_input("Kredi Tutarı (Yerel Para Birimi)", 500, 20000, 3000, step=100)
+                mevcut_kredi = st.slider("Mevcut Kredi Sayısı", 1, 4, 1)
+            girdi = sonuc['varsayilan'].copy()
+            for kolon, deger in [('age', yas), ('duration', sure_ay), ('credit_amount', tutar), ('existing_credits', mevcut_kredi)]:
+                if kolon in girdi.index:
+                    girdi[kolon] = deger
+            X_girdi = pd.DataFrame([girdi])[sonuc['kolonlar']]
+            risk_skoru = sonuc['model'].predict_proba(X_girdi)[0, 1] * 100
+        else:
+            gelir = st.number_input("Aylık Gelir (TL)", 8000, 200000, 35000, step=1000)
+            borc = st.number_input("Mevcut Kredi Borcu (TL)", 0, 500000, 10000, step=1000)
+            yas = st.slider("Yaş", 18, 75, 35)
+            sure_ay = st.slider("Kredi Vadesi (Ay)", 6, 60, 24)
+            X_girdi = pd.DataFrame([[gelir, borc, yas, sure_ay]], columns=['gelir', 'borc', 'yas', 'sure_ay'])
+            risk_skoru = sonuc['model'].predict_proba(X_girdi)[0, 1] * 100
+
+        st.metric("Temerrüt (Default) Olasılığı", f"%{risk_skoru:.1f}")
+        if risk_skoru > 50:
+            st.error("⚠️ Yüksek risk — manuel inceleme önerilir.")
+        if st.button("Riski Kaydet"):
+            kayit_ekle("Kredi Risk Skoru (LogReg)", "girdi kaydedildi", f"%{risk_skoru:.1f}")
+            st.success("Veritabanına kaydedildi.")
+
+    with t2:
+        egitim_notu("""
+**Model bir olasılık üretir, karar mekanizması ise tek bir sayı değildir: nerede "onayla", nerede
+"reddet" diyeceğinizi belirleyen eşik (cut-off) değeridir.** Aynı model, eşik 0.30 iken çok daha
+temkinli, eşik 0.70 iken çok daha cömert davranır — model değişmez, karar politikası değişir.
+
+Bu, tam olarak bir kredi risk analistinin gündelik işidir: **onay oranı (approval rate)** ile
+**portföy temerrüt oranı (bad rate)** arasında bir ödünleşim (trade-off) var. Eşiği düşürürseniz
+daha az kişiyi onaylarsınız ama onayladıklarınız daha güvenlidir; eşiği yükseltirseniz ciro artar
+ama battal (bad) müşteri oranı da artar. "Doğru" eşik, şirketin risk iştahına ve marj yapısına
+bağlıdır — burada test kümesi üzerinde bu ödünleşimi görselleştiriyorum.
+""", baslik="📚 Eşik analizi nedir, neden önemli?")
+
+        y_test = sonuc['y_test']
+        y_prob_test = sonuc['y_prob_test']
+        esik_araligi = np.linspace(0.05, 0.95, 37)
+        onay_oranlari, bad_oranlari = [], []
+        for e in esik_araligi:
+            onaylanan = y_prob_test <= e
+            onay_orani = onaylanan.mean() * 100
+            bad_orani = (y_test[onaylanan].mean() * 100) if onaylanan.sum() > 0 else 0
+            onay_oranlari.append(onay_orani)
+            bad_oranlari.append(bad_orani)
+
+        secili_esik = st.slider("Onay Eşiği (bu olasılığın ALTINDAKİ başvurular onaylanır)", 0.05, 0.95, 0.50, 0.01)
+        onaylanan_secili = y_prob_test <= secili_esik
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Onay Oranı", f"%{onaylanan_secili.mean()*100:.1f}")
+        c2.metric("Onaylanan Portföyde Temerrüt (Bad Rate)", f"%{(y_test[onaylanan_secili].mean()*100 if onaylanan_secili.sum()>0 else 0):.1f}")
+        c3.metric("Reddedilen Başvuru Oranı", f"%{(1-onaylanan_secili.mean())*100:.1f}")
+
+        fig_esik = go.Figure()
+        fig_esik.add_trace(go.Scatter(x=list(esik_araligi), y=onay_oranlari, name="Onay Oranı (%)", mode="lines"))
+        fig_esik.add_trace(go.Scatter(x=list(esik_araligi), y=bad_oranlari, name="Bad Rate — Onaylananlarda Temerrüt (%)", mode="lines"))
+        fig_esik.add_vline(x=secili_esik, line_dash="dash", line_color="#0055a5")
+        fig_esik.update_layout(title="Eşik Değerine Göre Onay Oranı vs. Bad Rate", xaxis_title="Onay Eşiği (Cut-off)",
+                                yaxis_title="Oran (%)", legend=dict(orientation="h", yanchor="bottom", y=1.02))
+        st.plotly_chart(fig_esik, width='stretch')
+        st.caption("Test kümesi (gerçek/sentetik ayrımından bağımsız, modelin hiç görmediği veri) üzerinde hesaplanmıştır.")
+
+    with t3:
+        egitim_notu("""
+**WOE (Weight of Evidence) / IV (Information Value)**, kredi skorlama dünyasında değişken seçiminin
+standart aracıdır. Mantığı basit: bir değişkeni (örn. gelir) dilimlere ayırırsınız, her dilimde
+"iyi" ve "kötü" müşteri oranının log-oranını (WOE) hesaplarsınız; tüm dilimlerdeki bu farkın
+ağırlıklı toplamı da o değişkenin **Information Value**'sunu verir — değişken temerrüdü ne kadar
+iyi ayırt ediyor? IV < 0.02 zayıf, 0.02–0.3 arası orta-güçlü, 0.3 üzeri çok güçlü kabul edilir.
+Bu site lojistik regresyon katsayılarını doğrudan kullanıyor; kurumsal scorecard'larda genelde
+katsayılar yerine ham WOE değerleri kullanılıp, sonuç 300–850 aralığında bir "skor kartı" puanına
+dönüştürülür (skor = temel puan + Σ WOE_i × ağırlık_i).
+
+**Expected Loss (EL)**, bir kredi risk analistinin raporladığı en temel portföy metriğidir:
+
+EL = PD × LGD × EAD
+
+- **PD (Probability of Default):** Yukarıdaki modelin ürettiği temerrüt olasılığı.
+- **LGD (Loss Given Default):** Temerrüt olursa, teminat/tahsilat sonrası gerçekte kaybedilen oran.
+- **EAD (Exposure at Default):** Temerrüt anındaki toplam risk tutarı (genelde kredi bakiyesi).
+
+Bu üçünün çarpımı, "bu kredi için ortalamada ne kadar zarar bekliyorum?" sorusunun cevabıdır ve
+banka bu tutarı karşılık (provizyon) olarak ayırır.
+""", baslik="📚 Scorecard mantığı & Expected Loss formülü")
+
+        st.markdown("##### Basit Scorecard Görünümü")
+        skor_kart = 300 + (1 - risk_skoru / 100) * 550
+        st.metric("Skor Kartı Puanı (300–850 aralığına ölçeklenmiş)", f"{skor_kart:.0f}")
+        st.caption("Skor = 300 + (1 − PD) × 550 — düşük PD, yüksek skora karşılık gelir (basitleştirilmiş doğrusal ölçekleme).")
+
+        st.markdown("##### Beklenen Kayıp (Expected Loss) Paneli")
         c1, c2 = st.columns(2)
         with c1:
-            yas = st.slider("Yaş", 18, 75, 35)
-            sure_ay = st.slider("Kredi Vadesi (Ay)", 6, 72, 24)
+            lgd = st.slider("LGD — Temerrüt Halinde Kayıp Oranı (%)", 10, 100, 45) / 100
         with c2:
-            tutar = st.number_input("Kredi Tutarı (Yerel Para Birimi)", 500, 20000, 3000, step=100)
-            mevcut_kredi = st.slider("Mevcut Kredi Sayısı", 1, 4, 1)
-        girdi = sonuc['varsayilan'].copy()
-        for kolon, deger in [('age', yas), ('duration', sure_ay), ('credit_amount', tutar), ('existing_credits', mevcut_kredi)]:
-            if kolon in girdi.index:
-                girdi[kolon] = deger
-        X_girdi = pd.DataFrame([girdi])[sonuc['kolonlar']]
-        risk_skoru = sonuc['model'].predict_proba(X_girdi)[0, 1] * 100
-    else:
-        gelir = st.number_input("Aylık Gelir (TL)", 8000, 200000, 35000, step=1000)
-        borc = st.number_input("Mevcut Kredi Borcu (TL)", 0, 500000, 10000, step=1000)
-        yas = st.slider("Yaş", 18, 75, 35)
-        sure_ay = st.slider("Kredi Vadesi (Ay)", 6, 60, 24)
-        X_girdi = pd.DataFrame([[gelir, borc, yas, sure_ay]], columns=['gelir', 'borc', 'yas', 'sure_ay'])
-        risk_skoru = sonuc['model'].predict_proba(X_girdi)[0, 1] * 100
-
-    st.metric("Temerrüt (Default) Olasılığı", f"%{risk_skoru:.1f}")
-    if risk_skoru > 50:
-        st.error("⚠️ Yüksek risk — manuel inceleme önerilir.")
-    if st.button("Riski Kaydet"):
-        kayit_ekle("Kredi Risk Skoru (LogReg)", "girdi kaydedildi", f"%{risk_skoru:.1f}")
-        st.success("Veritabanına kaydedildi.")
+            ead = st.number_input("EAD — Temerrüt Anındaki Risk Tutarı (TL)", 1000, 5_000_000, 100_000, step=1000)
+        pd_oran = risk_skoru / 100
+        el_deger = pd_oran * lgd * ead
+        c1, c2, c3 = st.columns(3)
+        c1.metric("PD (Skorlama sekmesinden)", f"%{pd_oran*100:.1f}")
+        c2.metric("LGD", f"%{lgd*100:.0f}")
+        c3.metric("Beklenen Kayıp (EL)", f"{el_deger:,.0f} TL")
+        st.latex(r"EL = PD \times LGD \times EAD")
+        if st.button("Beklenen Kaybı Kaydet"):
+            kayit_ekle("Kredi Expected Loss", f"PD:%{pd_oran*100:.1f}, LGD:%{lgd*100:.0f}, EAD:{ead}", f"{el_deger:,.0f} TL")
+            st.success("Veritabanına kaydedildi.")
 
 def churn_sayfasi():
     st.header("Müşteri Kaybı (Churn) Erken Uyarı Sistemi")
@@ -2452,21 +2542,156 @@ modellerinde genelde müşteri elde tutma olasılığı (survival/churn olasıl�
 doğrudan bağlantılı) ve zaman değeri (iskonto) de hesaba katılır, yani CLV ve Churn modelleri üretimde
 genelde birlikte çalışır.
 """)
-    police_tutari = st.number_input("Poliçe Tutarı", value=4500.0)
-    islem_sayisi = st.slider("Yıllık İşlem Sayısı", 1, 12, 2)
-    omur = st.slider("Beklenen Müşteri Ömrü (Yıl)", 1, 20, 5)
-    marj = st.slider("Kâr Marjı (%)", 5, 50, 20) / 100
-    clv_deger = police_tutari * islem_sayisi * omur * marj
-    st.metric("Ortalama CLV", f"{clv_deger:,.2f} TL")
-    st.latex(r"CLV = (\text{Ort. Harcama} \times \text{Frekans} \times \text{Ömür}) \times \text{Marj}")
+    t1, t2 = st.tabs(["💎 CLV Hesaplama", "💹 Fiyat Değişikliği & Churn Senaryosu (What-if)"])
+
+    with t1:
+        police_tutari = st.number_input("Poliçe Tutarı", value=4500.0)
+        islem_sayisi = st.slider("Yıllık İşlem Sayısı", 1, 12, 2)
+        omur = st.slider("Beklenen Müşteri Ömrü (Yıl)", 1, 20, 5)
+        marj = st.slider("Kâr Marjı (%)", 5, 50, 20) / 100
+        clv_deger = police_tutari * islem_sayisi * omur * marj
+        st.metric("Ortalama CLV", f"{clv_deger:,.2f} TL")
+        st.latex(r"CLV = (\text{Ort. Harcama} \times \text{Frekans} \times \text{Ömür}) \times \text{Marj}")
+
+    with t2:
+        egitim_notu("""
+**Fiyat artışının iki zıt etkisi vardır:** her bir müşteriden elde edilen gelir artar, ama churn
+(müşteri kaybı) oranı da genelde yükselir — kimse fiyat artışına kayıtsız kalmaz. "Fiyatlandırma ve
+Ticari Analitik" rolünün özü tam olarak bu dengeyi bulmaktır: **net etki pozitif mi, negatif mi?**
+
+Burada basit bir **fiyat esnekliği (elasticity)** varsayımı kullanıyorum: churn oranındaki artış,
+fiyat değişim yüzdesiyle ve bir esneklik katsayısıyla orantılıdır. Esneklik katsayısı ne kadar
+yüksekse, müşteriler fiyata o kadar duyarlıdır (rekabetin yoğun olduğu bir sigorta ürününde bu
+katsayı genelde yüksektir). Ortalama müşteri ömrü de basitçe `1 / churn oranı` ile yaklaşık olarak
+tahmin edilir — churn oranı ne kadar düşükse müşteri o kadar uzun kalır.
+""", baslik="📚 Fiyat-churn ilişkisi nasıl modellenir?")
+
+        c1, c2 = st.columns(2)
+        with c1:
+            taban_police = st.number_input("Taban Poliçe Tutarı (TL)", value=4500.0, key="wi_police")
+            taban_churn = st.slider("Taban Yıllık Churn Oranı (%)", 5, 60, 20, key="wi_churn") / 100
+            islem_sayisi2 = st.slider("Yıllık İşlem Sayısı ", 1, 12, 2, key="wi_islem")
+        with c2:
+            marj2 = st.slider("Kâr Marjı (%) ", 5, 50, 20, key="wi_marj") / 100
+            esneklik = st.slider("Fiyat Esnekliği (churn artış katsayısı)", 0.0, 3.0, 1.0, 0.1, key="wi_esneklik")
+
+        fiyat_degisimi = st.slider("Fiyat Değişikliği (%)", -20, 50, 10, key="wi_fiyat")
+
+        def _senaryo_hesapla(fd_yuzde):
+            yeni_fiyat = taban_police * (1 + fd_yuzde / 100)
+            yeni_churn = np.clip(taban_churn * (1 + esneklik * fd_yuzde / 100), 0.01, 0.95)
+            yeni_omur = 1 / yeni_churn
+            yeni_clv = yeni_fiyat * islem_sayisi2 * yeni_omur * marj2
+            return yeni_clv, yeni_churn
+
+        taban_omur = 1 / taban_churn
+        taban_clv = taban_police * islem_sayisi2 * taban_omur * marj2
+        secili_clv, secili_churn = _senaryo_hesapla(fiyat_degisimi)
+
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Taban CLV", f"{taban_clv:,.0f} TL")
+        c2.metric("Senaryo CLV", f"{secili_clv:,.0f} TL", delta=f"{secili_clv - taban_clv:,.0f} TL")
+        c3.metric("Senaryo Churn Oranı", f"%{secili_churn*100:.1f}", delta=f"%{(secili_churn-taban_churn)*100:.1f}")
+
+        fd_araligi = np.linspace(-20, 50, 36)
+        clv_serisi = [_senaryo_hesapla(fd)[0] for fd in fd_araligi]
+        fig_wi = go.Figure()
+        fig_wi.add_trace(go.Scatter(x=list(fd_araligi), y=clv_serisi, name="Senaryo CLV", mode="lines"))
+        fig_wi.add_hline(y=taban_clv, line_dash="dash", line_color="gray", annotation_text="Taban CLV")
+        fig_wi.add_vline(x=fiyat_degisimi, line_dash="dash", line_color="#0055a5")
+        fig_wi.update_layout(title="Fiyat Değişiminin CLV Üzerindeki Net Etkisi", xaxis_title="Fiyat Değişikliği (%)",
+                              yaxis_title="Beklenen CLV (TL)")
+        st.plotly_chart(fig_wi, width='stretch')
+        st.latex(r"\text{Yeni Churn} = \text{Taban Churn} \times (1 + \epsilon \cdot \Delta \text{Fiyat}\%)"
+                 r"\quad,\quad \text{Ömür} \approx \frac{1}{\text{Churn}}")
+
+        en_iyi_idx = int(np.argmax(clv_serisi))
+        st.caption(f"Bu esneklik varsayımı altında CLV'yi maksimize eden fiyat değişimi: "
+                   f"%{fd_araligi[en_iyi_idx]:.0f} (Senaryo CLV: {clv_serisi[en_iyi_idx]:,.0f} TL)")
+
+        if st.button("Fiyat Senaryosunu Kaydet"):
+            kayit_ekle("Fiyat-Churn What-if", f"Fiyat Değişimi:%{fiyat_degisimi}, Esneklik:{esneklik}",
+                       f"Senaryo CLV: {secili_clv:,.0f} TL")
+            st.success("Veritabanına kaydedildi.")
 
 # ---------------------------------------------------------
 # SİSTEM & İLETİŞİM
 # ---------------------------------------------------------
-def kisisel_gecmis_sayfasi():
-    st.header("🗂️ Kişisel Simülasyon Geçmişim")
-    aktif = st.session_state.get("aktif_kullanici", None)
+def butce_raporlama_sayfasi():
+    st.header("Bütçe Planlama & Raporlama (Bütçe vs. Gerçekleşen)")
+    egitim_notu("""
+**Bütçe-gerçekleşen (budget vs. actual) varyans analizi**, bir raporlama/bütçe uzmanının en sık
+ürettiği tablodur: "ne planlamıştık, gerçekte ne oldu, aradaki fark ne kadar ve neden önemli?"
 
+**Sapma yüzdesi** tek başına yanıltıcı olabilir — küçük bir bütçe kaleminde %30 sapma, büyük bir
+kalemdeki %5 sapmadan çok daha az TL etkisi yaratabilir. Bu yüzden bu panelde hem **TL cinsinden
+mutlak sapmayı** hem de **yüzdesel sapmayı** birlikte gösteriyorum; gerçek raporlamada ikisi
+birlikte okunur, tek biri değil.
+
+Aşağıdaki tabloyu kendi (veya örnek) aylık gelir/gider verinizle düzenleyebilirsiniz — bu, Excel/
+Power BI'da yapılan bütçe takibinin basitleştirilmiş bir dashboard karşılığıdır.
+""")
+
+    varsayilan_veri = pd.DataFrame({
+        "Ay": ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran"],
+        "Bütçe_Gelir": [500000, 510000, 520000, 530000, 540000, 550000],
+        "Gerçekleşen_Gelir": [480000, 525000, 505000, 560000, 530000, 575000],
+        "Bütçe_Gider": [400000, 405000, 410000, 415000, 420000, 425000],
+        "Gerçekleşen_Gider": [410000, 400000, 430000, 405000, 440000, 415000],
+    })
+
+    st.markdown("##### Aylık Bütçe & Gerçekleşen Veri Girişi")
+    duzenlenen = st.data_editor(varsayilan_veri, num_rows="dynamic", width='stretch', key="butce_editor")
+
+    if duzenlenen.empty or duzenlenen[["Bütçe_Gelir", "Gerçekleşen_Gelir", "Bütçe_Gider", "Gerçekleşen_Gider"]].isnull().any().any():
+        st.warning("Tabloyu eksiksiz doldurun.")
+        return
+
+    df = duzenlenen.copy()
+    df["Net_Bütçe"] = df["Bütçe_Gelir"] - df["Bütçe_Gider"]
+    df["Net_Gerçekleşen"] = df["Gerçekleşen_Gelir"] - df["Gerçekleşen_Gider"]
+    df["Sapma_TL"] = df["Net_Gerçekleşen"] - df["Net_Bütçe"]
+    df["Sapma_Yüzde"] = np.where(df["Net_Bütçe"] != 0, df["Sapma_TL"] / df["Net_Bütçe"].abs() * 100, 0)
+
+    toplam_sapma_tl = df["Sapma_TL"].sum()
+    ort_sapma_yuzde = df["Sapma_Yüzde"].mean()
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Toplam Net Sapma", f"{toplam_sapma_tl:,.0f} TL")
+    c2.metric("Ortalama Sapma Yüzdesi", f"%{ort_sapma_yuzde:.1f}")
+    c3.metric("Dönem Sayısı", f"{len(df)} ay")
+
+    fig_trend = go.Figure()
+    fig_trend.add_trace(go.Scatter(x=df["Ay"], y=df["Net_Bütçe"], name="Net Bütçe", mode="lines+markers"))
+    fig_trend.add_trace(go.Scatter(x=df["Ay"], y=df["Net_Gerçekleşen"], name="Net Gerçekleşen", mode="lines+markers"))
+    fig_trend.update_layout(title="Net Nakit Akışı: Bütçe vs. Gerçekleşen", xaxis_title="Ay", yaxis_title="TL",
+                             legend=dict(orientation="h", yanchor="bottom", y=1.02))
+    st.plotly_chart(fig_trend, width='stretch')
+
+    renkler = ["#c0392b" if v < 0 else "#1e6b34" for v in df["Sapma_Yüzde"]]
+    fig_sapma = go.Figure(go.Bar(x=df["Ay"], y=df["Sapma_Yüzde"], marker_color=renkler))
+    fig_sapma.update_layout(title="Aylık Sapma Yüzdesi (Gerçekleşen − Bütçe)", xaxis_title="Ay", yaxis_title="Sapma (%)")
+    st.plotly_chart(fig_sapma, width='stretch')
+
+    st.markdown("##### Detay Tablo")
+    st.dataframe(
+        df.style.format({
+            "Bütçe_Gelir": "{:,.0f}", "Gerçekleşen_Gelir": "{:,.0f}",
+            "Bütçe_Gider": "{:,.0f}", "Gerçekleşen_Gider": "{:,.0f}",
+            "Net_Bütçe": "{:,.0f}", "Net_Gerçekleşen": "{:,.0f}",
+            "Sapma_TL": "{:,.0f}", "Sapma_Yüzde": "{:.1f}%"
+        }),
+        width='stretch'
+    )
+
+    if st.button("Raporu Kaydet"):
+        kayit_ekle("Bütçe-Gerçekleşen Raporu", f"{len(df)} aylık dönem",
+                   f"Toplam Sapma: {toplam_sapma_tl:,.0f} TL (%{ort_sapma_yuzde:.1f})")
+        st.success("Veritabanına kaydedildi.")
+
+def veritabani_sayfasi():
+    st.header("📂 Veritabanı & Geçmiş Paneli")
+    aktif = st.session_state.get("aktif_kullanici", None)
+    
     if aktif is None:
         st.info("🔒 Kendi geçmiş simülasyonlarınızı görmek için lütfen sol menüden giriş yapın.")
     else:
@@ -2476,9 +2701,9 @@ def kisisel_gecmis_sayfasi():
             st.dataframe(df_kisi, width='stretch')
         else:
             st.markdown("Henüz kayıtlı bir simülasyonunuz yok. Modüllerde işlem yaptıkça burada listelenecektir.")
-
-def veritabani_sayfasi():
-    st.header("🕵️ Sistem Sahibi / Ziyaretçi Takip Paneli")
+            
+    st.markdown("---")
+    st.subheader("🕵️ Sistem Sahibi / Ziyaretçi Takip Paneli")
     yonetici_sifresi = st.secrets.get("YONETICI_SIFRE", "sultan123")
     girilen_sifre = st.text_input("Yönetici Şifresi (Sadece sizin erişiminiz için)", type="password", key="admin_sifre_giris")
     
@@ -2564,12 +2789,9 @@ def hakkinda_sayfasi():
 # menüye ancak SEN kendi üye hesabınla giriş yaptığında ekleniyor.
 # Secrets'a ADMIN_KULLANICI_ADI olarak kendi kullanıcı adını yazman yeterli.
 _admin_kullanici_adi = st.secrets.get("ADMIN_KULLANICI_ADI", "")
-_sistem_sayfalari = [
-    st.Page(kisisel_gecmis_sayfasi, title="Kişisel Geçmişim", icon="🗂️"),
-    st.Page(hakkinda_sayfasi, title="Hakkımda & İletişim", icon="👩‍💻"),
-]
+_sistem_sayfalari = [st.Page(hakkinda_sayfasi, title="Hakkımda & İletişim", icon="👩‍💻")]
 if _admin_kullanici_adi and st.session_state.get("aktif_kullanici") == _admin_kullanici_adi:
-    _sistem_sayfalari.insert(0, st.Page(veritabani_sayfasi, title="Veritabanı Geçmişi (Yönetici)", icon="📂"))
+    _sistem_sayfalari.insert(0, st.Page(veritabani_sayfasi, title="Veritabanı Geçmişi", icon="📂"))
 
 pg = st.navigation({
     "Genel Bakış & Canlı Piyasa": [
@@ -2586,6 +2808,9 @@ pg = st.navigation({
     ],
     "📊 Kantitatif Finans (Canlı Optimizasyon)": [
         st.Page(markowitz_sayfasi, title="Markowitz Portföy Optimizasyonu", icon="🥧"),
+    ],
+    "💰 Bütçe & Raporlama": [
+        st.Page(butce_raporlama_sayfasi, title="Bütçe vs. Gerçekleşen Analizi", icon="💰"),
     ],
     "🕌 Katılım Bankacılığı": [
         st.Page(katilim_fon_sayfasi, title="Murabaha & Sukuk Araçları", icon="🕌"),
