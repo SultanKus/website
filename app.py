@@ -2538,6 +2538,15 @@ def hakkinda_sayfasi():
 # ---------------------------------------------------------
 # NAVİGASYON
 # ---------------------------------------------------------
+
+# "Veritabanı Geçmişi" (yönetici paneli) normal ziyaretçilere HİÇ görünmesin diye
+# menüye ancak URL'de gizli bir anahtar varsa ekleniyor.
+# Erişmek için siteni şöyle açman gerekecek: https://siten.streamlit.app/?panel=GIZLI_ANAHTARIN
+_gizli_panel_anahtari = st.secrets.get("ADMIN_URL_ANAHTARI", "")
+_sistem_sayfalari = [st.Page(hakkinda_sayfasi, title="Hakkımda & İletişim", icon="👩‍💻")]
+if _gizli_panel_anahtari and st.query_params.get("panel") == _gizli_panel_anahtari:
+    _sistem_sayfalari.insert(0, st.Page(veritabani_sayfasi, title="Veritabanı Geçmişi", icon="📂"))
+
 pg = st.navigation({
     "Genel Bakış & Canlı Piyasa": [
         st.Page(ana_sayfa, title="Ana Sayfa", icon="🏠"),
@@ -2576,10 +2585,7 @@ pg = st.navigation({
         st.Page(telematik_sayfasi, title="Telematik Risk Skorlama", icon="🚗"),
         st.Page(clv_sayfasi, title="Müşteri Yaşam Değeri", icon="💎"),
     ],
-    "Sistem & İletişim": [
-        st.Page(veritabani_sayfasi, title="Veritabanı Geçmişi", icon="📂"),
-        st.Page(hakkinda_sayfasi, title="Hakkımda & İletişim", icon="👩‍💻"),
-    ]
+    "Sistem & İletişim": _sistem_sayfalari
 })
 
 pg.run()
