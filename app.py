@@ -13,6 +13,7 @@ import os
 from datetime import datetime
 import yfinance as yf
 import requests
+import re
 from math import erf
 from scipy.optimize import minimize
 
@@ -162,6 +163,14 @@ def veritabani_olustur():
             kayit_tarihi TEXT
         )
     """)
+    try:
+        c.execute("ALTER TABLE kullanicilar ADD COLUMN ad_soyad TEXT")
+    except sqlite3.OperationalError:
+        pass
+    try:
+        c.execute("ALTER TABLE kullanicilar ADD COLUMN email TEXT")
+    except sqlite3.OperationalError:
+        pass
     c.execute("""
         CREATE TABLE IF NOT EXISTS ziyaretci_loglari (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -236,26 +245,38 @@ st.sidebar.subheader("👤 Kullanıcı Paneli")
 
 if st.session_state["aktif_kullanici"] is None:
     islem = st.sidebar.radio("İşlem Seçin", ["Giriş Yap", "Üye Ol"], horizontal=True, key="auth_radio")
-    k_adi = st.sidebar.text_input("Kullanıcı Adı", key="sidebar_k_adi")
-    sifre = st.sidebar.text_input("Şifre", type="password", key="sidebar_sifre")
 
     if islem == "Üye Ol":
+        ad_soyad = st.sidebar.text_input("Ad Soyad", key="sidebar_ad_soyad")
+        email = st.sidebar.text_input("E-posta", key="sidebar_email")
+        k_adi = st.sidebar.text_input("Kullanıcı Adı", key="sidebar_k_adi_kayit")
+        sifre = st.sidebar.text_input("Şifre (en az 6 karakter, 1 harf + 1 rakam)", type="password", key="sidebar_sifre_kayit")
+
         if st.sidebar.button("Kayıt Ol"):
-            if k_adi and sifre:
+            email_gecerli = bool(re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email or ""))
+            sifre_gecerli = bool(re.match(r"^(?=.*[A-Za-z])(?=.*\d).{6,}$", sifre or ""))
+
+            if not (ad_soyad and email and k_adi and sifre):
+                st.sidebar.warning("Tüm alanları doldurun.")
+            elif not email_gecerli:
+                st.sidebar.error("Geçerli bir e-posta adresi girin (örn: ad@ornek.com).")
+            elif not sifre_gecerli:
+                st.sidebar.error("Şifre en az 6 karakter olmalı ve en az 1 harf + 1 rakam içermeli.")
+            else:
                 try:
                     conn = sqlite3.connect('finansal_lab.db', check_same_thread=False)
                     c = conn.cursor()
-                    c.execute("INSERT INTO kullanicilar (kullanici_adi, sifre, kayit_tarihi) VALUES (?, ?, ?)",
-                              (k_adi, sifre_hashle(sifre), datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+                    c.execute("INSERT INTO kullanicilar (kullanici_adi, sifre, kayit_tarihi, ad_soyad, email) VALUES (?, ?, ?, ?, ?)",
+                              (k_adi, sifre_hashle(sifre), datetime.now().strftime("%Y-%m-%d %H:%M:%S"), ad_soyad, email))
                     conn.commit()
                     conn.close()
-                    ziyaret_logla("Yeni Üye", f"Kullanıcı kayıt oldu: {k_adi}")
+                    ziyaret_logla("Yeni Üye", f"Kullanıcı kayıt oldu: {k_adi} ({ad_soyad}, {email})")
                     st.sidebar.success("Kayıt başarılı! Şimdi giriş yapabilirsiniz.")
                 except Exception:
                     st.sidebar.error("Bu kullanıcı adı zaten alınmış.")
-            else:
-                st.sidebar.warning("Tüm alanları doldurun.")
     else:
+        k_adi = st.sidebar.text_input("Kullanıcı Adı", key="sidebar_k_adi_giris")
+        sifre = st.sidebar.text_input("Şifre", type="password", key="sidebar_sifre_giris")
         if st.sidebar.button("Giriş Yap"):
             conn = sqlite3.connect('finansal_lab.db', check_same_thread=False)
             df_u = pd.read_sql("SELECT * FROM kullanicilar WHERE kullanici_adi = ?", conn, params=(k_adi,))
@@ -2540,11 +2561,11 @@ def hakkinda_sayfasi():
 # ---------------------------------------------------------
 
 # "Veritabanı Geçmişi" (yönetici paneli) normal ziyaretçilere HİÇ görünmesin diye
-# menüye ancak URL'de gizli bir anahtar varsa ekleniyor.
-# Erişmek için siteni şöyle açman gerekecek: https://siten.streamlit.app/?panel=GIZLI_ANAHTARIN
-_gizli_panel_anahtari = st.secrets.get("ADMIN_URL_ANAHTARI", "")
+# menüye ancak SEN kendi üye hesabınla giriş yaptığında ekleniyor.
+# Secrets'a ADMIN_KULLANICI_ADI olarak kendi kullanıcı adını yazman yeterli.
+_admin_kullanici_adi = st.secrets.get("ADMIN_KULLANICI_ADI", "")
 _sistem_sayfalari = [st.Page(hakkinda_sayfasi, title="Hakkımda & İletişim", icon="👩‍💻")]
-if _gizli_panel_anahtari and st.query_params.get("panel") == _gizli_panel_anahtari:
+if _admin_kullanici_adi and st.session_state.get("aktif_kullanici") == _admin_kullanici_adi:
     _sistem_sayfalari.insert(0, st.Page(veritabani_sayfasi, title="Veritabanı Geçmişi", icon="📂"))
 
 pg = st.navigation({
