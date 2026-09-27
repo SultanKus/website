@@ -7,7 +7,7 @@ from plotly.subplots import make_subplots
 from sklearn.datasets import fetch_openml
 from sklearn.linear_model import PoissonRegressor, LogisticRegression
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import roc_auc_score, f1_score, mean_poisson_deviance
+from sklearn.metrics import roc_auc_score, f1_score, mean_poisson_deviance, roc_curve, confusion_matrix
 import sqlite3
 import os
 from datetime import datetime
@@ -1778,7 +1778,7 @@ anlamsız olduğu için ikisini birlikte veriyorum, ikisi de test kümesinden.
     sonuc = kredi_risk_modelini_egit()
     model_rozeti(sonuc['auc'], sonuc['f1'], sonuc['kaynak'])
 
-    t1, t2, t3 = st.tabs(["🎯 Skorlama", "⚖️ Eşik (Cut-off) Analizi", "📋 Scorecard & Beklenen Kayıp"])
+    t1, t2, t3, t4 = st.tabs(["🎯 Skorlama", "⚖️ Eşik (Cut-off) Analizi", "📋 Scorecard & Beklenen Kayıp", "🔍 Model Açıklanabilirliği & Performans"])
 
     with t1:
         if sonuc['tip'] == 'gercek':
@@ -1894,6 +1894,70 @@ banka bu tutarı karşılık (provizyon) olarak ayırır.
         if st.button("Beklenen Kaybı Kaydet"):
             kayit_ekle("Kredi Expected Loss", f"PD:%{pd_oran*100:.1f}, LGD:%{lgd*100:.0f}, EAD:{ead}", f"{el_deger:,.0f} TL")
             st.success("Veritabanına kaydedildi.")
+
+    with t4:
+        egitim_notu("""
+**Bir modelin "iyi çalışması" yetmez, bankacılıkta *neden* öyle çalıştığını açıklayabilmek de
+şart.** Lojistik regresyonu diğer birçok algoritmaya tercih etmemin temel sebebi buydu: her
+değişkenin katsayısı, o değişkenin temerrüt riskini hangi yönde ve ne kadar ittiğini doğrudan
+söylüyor. Pozitif katsayı riski artırıyor, negatif katsayı azaltıyor; katsayının mutlak değeri
+büyüdükçe o değişkenin etkisi güçleniyor.
+
+**ROC eğrisi**, modelin farklı eşik değerlerinde Doğru Pozitif Oranı (Sensitivity) ile Yanlış
+Pozitif Oranı (1-Specificity) arasındaki dengeyi gösteriyor. Eğri sol-üst köşeye ne kadar
+yakınsa model o kadar başarılı; köşegen çizgi, yazı-tura atan (rastgele) bir modeli temsil eder.
+Eğrinin altındaki alan (AUC) da yukarıdaki rozette gördüğünüz sayı.
+
+**Confusion Matrix (Karmaşıklık Matrisi)** ise seçtiğiniz tek bir eşik değerinde (burada 0.50)
+modelin dört olası sonucunu gösteriyor: doğru onaylananlar, doğru reddedilenler, yanlışlıkla
+riskli görülüp reddedilen iyi müşteriler (False Positive) ve kaçırılan gerçek kötü müşteriler
+(False Negative). Kredi risk yönetiminde bu son hücre — kaçırılan temerrütler — en pahalıya mal
+olan hatadır.
+""", baslik="📚 Katsayı yorumu, ROC eğrisi ve Confusion Matrix nedir?")
+
+        y_test_t4 = sonuc['y_test']
+        y_prob_t4 = sonuc['y_prob_test']
+
+        st.markdown("##### Değişken Etkileri (Model Katsayıları)")
+        if sonuc['tip'] == 'gercek':
+            katsayi_kolonlari = list(sonuc['kolonlar'])
+        else:
+            katsayi_kolonlari = ['gelir', 'borc', 'yas', 'sure_ay']
+        katsayilar = sonuc['model'].coef_[0]
+        katsayi_df = pd.DataFrame({'değişken': katsayi_kolonlari, 'katsayı': katsayilar})
+        katsayi_df = katsayi_df.reindex(katsayi_df['katsayı'].abs().sort_values(ascending=False).index).head(12)
+        katsayi_df['yön'] = np.where(katsayi_df['katsayı'] > 0, 'Riski artırır', 'Riski azaltır')
+        fig_katsayi = px.bar(katsayi_df.sort_values('katsayı'), x='katsayı', y='değişken', orientation='h',
+                              color='yön', color_discrete_map={'Riski artırır': '#c0392b', 'Riski azaltır': '#1a7a4c'},
+                              title="En Etkili 12 Değişken (Lojistik Regresyon Katsayısı)")
+        fig_katsayi.update_layout(yaxis_title="", xaxis_title="Katsayı (log-odds etkisi)")
+        st.plotly_chart(fig_katsayi, width='stretch')
+        st.caption("Pozitif katsayı (kırmızı) temerrüt olasılığını artırır, negatif katsayı (yeşil) azaltır. "
+                   "Sadece en büyük mutlak etkiye sahip 12 değişken gösterilmiştir.")
+
+        c1, c2 = st.columns(2)
+        with c1:
+            st.markdown("##### ROC Eğrisi")
+            fpr, tpr, _ = roc_curve(y_test_t4, y_prob_t4)
+            fig_roc = go.Figure()
+            fig_roc.add_trace(go.Scatter(x=fpr, y=tpr, mode='lines', name=f"Model (AUC={sonuc['auc']:.3f})",
+                                          line=dict(color="#0055a5", width=3)))
+            fig_roc.add_trace(go.Scatter(x=[0, 1], y=[0, 1], mode='lines', name="Rastgele Model",
+                                          line=dict(color="gray", dash="dash")))
+            fig_roc.update_layout(xaxis_title="Yanlış Pozitif Oranı", yaxis_title="Doğru Pozitif Oranı",
+                                   legend=dict(orientation="h", yanchor="bottom", y=1.02))
+            st.plotly_chart(fig_roc, width='stretch')
+
+        with c2:
+            st.markdown("##### Confusion Matrix (Eşik = 0.50)")
+            y_pred_t4 = (y_prob_t4 > 0.50).astype(int)
+            cm = confusion_matrix(y_test_t4, y_pred_t4)
+            fig_cm = px.imshow(cm, text_auto=True, color_continuous_scale='Blues',
+                                x=['Tahmin: İyi', 'Tahmin: Kötü'], y=['Gerçek: İyi', 'Gerçek: Kötü'],
+                                labels=dict(color="Adet"))
+            fig_cm.update_layout(coloraxis_showscale=False)
+            st.plotly_chart(fig_cm, width='stretch')
+            st.caption("Test kümesindeki (modelin hiç görmediği veri) gerçek sonuçlar ile 0.50 eşiğindeki tahminlerin karşılaştırması.")
 
 def churn_sayfasi():
     st.header("Müşteri Kaybı (Churn) Erken Uyarı Sistemi")
