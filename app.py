@@ -24,7 +24,7 @@ from scipy.optimize import minimize
 # ---------------------------------------------------------
 st.set_page_config(
     page_title="Finansal Veri Bilimi & Aktüeryal Lab",
-    page_icon="💼",
+    page_icon=None,
     layout="wide"
 )
 
@@ -39,6 +39,13 @@ header[data-testid="stHeader"] * { color: #000000 !important; fill: #000000 !imp
 [data-testid="collapsedControl"] svg, [data-testid="collapsedControl"] path, [data-testid="stSidebarCollapsedControl"] svg, button[kind="header"] svg { color: #000000 !important; fill: #000000 !important; }
 [data-testid="stSidebar"] { background-color: #0b1f33; color: #ffffff; }
 [data-testid="stSidebar"] .stMarkdown h1, [data-testid="stSidebar"] .stMarkdown h2, [data-testid="stSidebar"] .stMarkdown h3, [data-testid="stSidebar"] span { color: #ffffff !important; }
+[data-testid="stSidebar"] * { color: #eef2f6 !important; }
+[data-testid="stSidebar"] [data-testid="stCaptionContainer"] *,
+[data-testid="stSidebar"] [data-testid="stCaptionContainer"] { color: #b7c2cd !important; }
+[data-testid="stSidebar"] a { color: #7fb3e8 !important; }
+[data-testid="stSidebar"] [data-testid="stSidebarNavLink"] span,
+[data-testid="stSidebar"] [data-testid="stSidebarNavLink"] p { color: #ffffff !important; }
+[data-testid="stSidebar"] button[kind="tertiary"], [data-testid="stSidebar"] button[kind="tertiary"] * { color: #7fb3e8 !important; }
 h1, h2, h3, h4, h5, h6 { color: #0b1f33 !important; font-weight: 700 !important; letter-spacing: -0.5px; }
 .stSlider [data-baseweb="slider"] div[role="slider"] { background-color: #0055a5 !important; border-color: #0055a5 !important; }
 .stSlider [data-baseweb="slider"] div > div > div > div { background-color: #0055a5 !important; }
@@ -3049,13 +3056,9 @@ pg = st.navigation({
         st.Page(churn_sayfasi, title="Churn Tahmini", icon="🚪"),
         st.Page(fraud_sayfasi, title="Fraud Uyarı Sistemi", icon="🕵️"),
     ],
-    "📊 Kantitatif Finans (Canlı Optimizasyon)": [
+    "💹 Finansal Araçlar & Planlama": [
         st.Page(markowitz_sayfasi, title="Markowitz Portföy Optimizasyonu", icon="🥧"),
-    ],
-    "💰 Bütçe & Raporlama": [
         st.Page(butce_raporlama_sayfasi, title="Bütçe vs. Gerçekleşen Analizi", icon="💰"),
-    ],
-    "🕌 Katılım Bankacılığı": [
         st.Page(katilim_fon_sayfasi, title="Murabaha & Sukuk Araçları", icon="🕌"),
     ],
     "📐 Aktüeryal Yöntemler": [
@@ -3063,6 +3066,8 @@ pg = st.navigation({
         st.Page(hayat_sigortasi_sayfasi, title="Hayat Sigortası Fiyatlama", icon="👨‍🦳"),
         st.Page(hasar_frekans_sayfasi, title="Hasar Frekans & Risk", icon="📉"),
         st.Page(monte_carlo_sayfasi, title="Monte Carlo Simülatörü", icon="🎲"),
+    ],
+    "🏛️ Risk & Sermaye Modelleri": [
         st.Page(solvency_sayfasi, title="Solvency II", icon="🏛️"),
         st.Page(black_scholes_sayfasi, title="Black-Scholes", icon="📈"),
         st.Page(kredi_var_sayfasi, title="Kredi Portföyü VaR", icon="📉"),
@@ -3072,6 +3077,8 @@ pg = st.navigation({
         st.Page(stres_testi_sayfasi, title="Aktüeryal Stres Testi", icon="⚡"),
         st.Page(alm_nakit_sayfasi, title="ALM Nakit Eşitleme", icon="🔄"),
         st.Page(alm_durasyon_sayfasi, title="ALM Durasyon", icon="⚖️"),
+    ],
+    "📈 Portföy & Müşteri Analitiği": [
         st.Page(varlik_dagilimi_sayfasi, title="Varlık Dağılımı", icon="📊"),
         st.Page(benchmark_sayfasi, title="Piyasa Kıyaslama", icon="📈"),
         st.Page(telematik_sayfasi, title="Telematik Risk Skorlama", icon="🚗"),
