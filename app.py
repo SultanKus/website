@@ -6,8 +6,10 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from sklearn.datasets import fetch_openml
 from sklearn.linear_model import PoissonRegressor, LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import roc_auc_score, f1_score, mean_poisson_deviance, roc_curve, confusion_matrix
+from sklearn.calibration import calibration_curve
 import sqlite3
 import os
 from datetime import datetime
@@ -412,14 +414,23 @@ def kredi_risk_modelini_egit():
         model = LogisticRegression(max_iter=3000, class_weight='balanced')
         model.fit(X_train, y_train)
         y_prob = model.predict_proba(X_test)[:, 1]
+        y_prob_train = model.predict_proba(X_train)[:, 1]
         auc = roc_auc_score(y_test, y_prob)
         f1 = f1_score(y_test, (y_prob > 0.5).astype(int))
+
+        rf_model = RandomForestClassifier(n_estimators=300, max_depth=6, class_weight='balanced', random_state=42)
+        rf_model.fit(X_train, y_train)
+        rf_prob = rf_model.predict_proba(X_test)[:, 1]
+        rf_auc = roc_auc_score(y_test, rf_prob)
+        rf_f1 = f1_score(y_test, (rf_prob > 0.5).astype(int))
+
         for kolon in ['age', 'duration', 'credit_amount', 'existing_credits']:
             if kolon not in X.columns:
                 raise KeyError(f"Beklenen sütun bulunamadı: {kolon}")
         return {"tip": "gercek", "model": model, "kolonlar": X.columns, "varsayilan": X.median(),
                 "auc": auc, "f1": f1, "kaynak": "OpenML German Credit (credit-g)",
-                "y_test": y_test.reset_index(drop=True), "y_prob_test": y_prob}
+                "y_test": y_test.reset_index(drop=True), "y_prob_test": y_prob,
+                "y_prob_train": y_prob_train, "rf_auc": rf_auc, "rf_f1": rf_f1}
     except Exception:
         df = _sentetik_veri_kredi()
         X, y = df.drop(columns=['hedef']), df['hedef']
@@ -427,11 +438,21 @@ def kredi_risk_modelini_egit():
         model = LogisticRegression(max_iter=1000, class_weight='balanced')
         model.fit(X_train, y_train)
         y_prob = model.predict_proba(X_test)[:, 1]
+        y_prob_train = model.predict_proba(X_train)[:, 1]
         auc = roc_auc_score(y_test, y_prob)
         f1 = f1_score(y_test, (y_prob > 0.5).astype(int))
+
+        rf_model = RandomForestClassifier(n_estimators=300, max_depth=6, class_weight='balanced', random_state=42)
+        rf_model.fit(X_train, y_train)
+        rf_prob = rf_model.predict_proba(X_test)[:, 1]
+        rf_auc = roc_auc_score(y_test, rf_prob)
+        rf_f1 = f1_score(y_test, (rf_prob > 0.5).astype(int))
+
         return {"tip": "sentetik", "model": model, "auc": auc, "f1": f1,
                 "kaynak": "Sentetik veri (gerçek veri setine erişilemedi)",
-                "y_test": y_test.reset_index(drop=True), "y_prob_test": y_prob}
+                "y_test": y_test.reset_index(drop=True), "y_prob_test": y_prob,
+                "y_prob_train": y_prob_train, "varsayilan": X.mean(),
+                "rf_auc": rf_auc, "rf_f1": rf_f1}
 
 @st.cache_resource
 def churn_modelini_egit():
@@ -1778,7 +1799,8 @@ anlamsız olduğu için ikisini birlikte veriyorum, ikisi de test kümesinden.
     sonuc = kredi_risk_modelini_egit()
     model_rozeti(sonuc['auc'], sonuc['f1'], sonuc['kaynak'])
 
-    t1, t2, t3, t4 = st.tabs(["🎯 Skorlama", "⚖️ Eşik (Cut-off) Analizi", "📋 Scorecard & Beklenen Kayıp", "🔍 Model Açıklanabilirliği & Performans"])
+    t1, t2, t3, t4, t5 = st.tabs(["🎯 Skorlama", "⚖️ Eşik (Cut-off) Analizi", "📋 Scorecard & Beklenen Kayıp",
+                                   "🔍 Model Açıklanabilirliği & Performans", "🧠 Gelişmiş Analiz"])
 
     with t1:
         if sonuc['tip'] == 'gercek':
@@ -1958,6 +1980,163 @@ olan hatadır.
             fig_cm.update_layout(coloraxis_showscale=False)
             st.plotly_chart(fig_cm, width='stretch')
             st.caption("Test kümesindeki (modelin hiç görmediği veri) gerçek sonuçlar ile 0.50 eşiğindeki tahminlerin karşılaştırması.")
+
+    with t5:
+        egitim_notu("""
+**Bir modelin AUC'si iyi olabilir ama bu, tek bir kişiye "neden bu skoru aldın" diye açıklama
+yapmak için yeterli değildir; skorun ne kadar güvenilir bir olasılık olduğunu, hangi eşiğin
+gerçekten kâr getirdiğini, daha karmaşık bir modelin ne kazandırıp ne kaybettirdiğini ve model
+canlıya alındıktan sonra popülasyonun kayıp kaymadığını da göstermek gerekir.** Bu sekme, tek bir
+skorlama modelini üretim ortamında "yönetilen" bir modele dönüştüren beş adımı bir araya getiriyor.
+""", baslik="📚 Bu sekme neden var?")
+
+        st.markdown("#### 1️⃣ Bu Başvuru İçin Kişiye Özel Açıklama")
+        st.caption("Skorlama sekmesinde girdiğiniz senaryo, ortalama/medyan bir başvurana göre "
+                    "değişken değişken nereden risk kazanıyor ya da kaybediyor?")
+        kolonlar_shap = list(sonuc['kolonlar']) if sonuc['tip'] == 'gercek' else ['gelir', 'borc', 'yas', 'sure_ay']
+        katsayilar_shap = sonuc['model'].coef_[0]
+        girdi_degerleri = X_girdi.iloc[0][kolonlar_shap]
+        taban_degerleri = sonuc['varsayilan'][kolonlar_shap]
+        katkilar = katsayilar_shap * (girdi_degerleri.values - taban_degerleri.values)
+        katki_df = pd.DataFrame({'değişken': kolonlar_shap, 'katkı (log-odds)': katkilar})
+        katki_df = katki_df.reindex(katki_df['katkı (log-odds)'].abs().sort_values(ascending=False).index).head(8)
+        katki_df['yön'] = np.where(katki_df['katkı (log-odds)'] > 0, 'Riski artırdı', 'Riski azalttı')
+        fig_katki = px.bar(katki_df.sort_values('katkı (log-odds)'), x='katkı (log-odds)', y='değişken', orientation='h',
+                            color='yön', color_discrete_map={'Riski artırdı': '#c0392b', 'Riski azalttı': '#1a7a4c'},
+                            title="Bu Başvuruda Skoru En Çok Etkileyen 8 Değişken (Ortalama Başvurana Göre)")
+        fig_katki.update_layout(yaxis_title="", xaxis_title="Katkı (log-odds etkisi)")
+        st.plotly_chart(fig_katki, width='stretch')
+        st.caption("Yöntem: lojistik regresyon doğrusal olduğu için, her değişkenin katkısı "
+                    "katsayı × (bu başvurunun değeri − tipik/ortalama başvurunun değeri) olarak tam olarak "
+                    "ayrıştırılabilir (SHAP'in doğrusal modeller için ürettiği sonuçla matematiksel olarak aynıdır). "
+                    "Bu, 'red gerekçesi' (adverse action notice) için kullanılabilecek türden kişiye özel bir açıklamadır.")
+
+        st.markdown("---")
+        st.markdown("#### 2️⃣ Kalibrasyon: Model '%30' Dediğinde Gerçekten %30 mu?")
+        egitim_notu("""
+AUC modelin riskli/risksiz müşteriyi **sıralama** becerisini ölçer, ama ürettiği sayının gerçek
+bir olasılık olup olmadığını söylemez. Bir kalibrasyon (reliability) eğrisi, test kümesini tahmin
+edilen olasılığa göre dilimlere ayırıp her dilimde modelin söylediği ortalama olasılık ile
+gerçekte gözlenen temerrüt oranını karşılaştırır. Nokta ne kadar diyagonale yakınsa, model o
+dilimde o kadar güvenilir. Expected Loss hesabının (Scorecard sekmesi) anlamlı olması, PD'nin
+kalibre olmasına bağlıdır — kalibrasyon zayıfsa EL sistematik olarak yanlış olur.
+""", baslik="📚 Kalibrasyon neden önemli?")
+        y_test_kal = sonuc['y_test']
+        y_prob_kal = sonuc['y_prob_test']
+        try:
+            gozlenen, tahmin_edilen = calibration_curve(y_test_kal, y_prob_kal, n_bins=8, strategy='quantile')
+            fig_kal = go.Figure()
+            fig_kal.add_trace(go.Scatter(x=tahmin_edilen, y=gozlenen, mode='lines+markers', name="Model",
+                                          line=dict(color="#0055a5", width=3)))
+            fig_kal.add_trace(go.Scatter(x=[0, 1], y=[0, 1], mode='lines', name="Kusursuz Kalibrasyon",
+                                          line=dict(color="gray", dash="dash")))
+            fig_kal.update_layout(xaxis_title="Modelin Öngördüğü Ortalama Olasılık", yaxis_title="Gözlenen Gerçek Temerrüt Oranı",
+                                   legend=dict(orientation="h", yanchor="bottom", y=1.02))
+            st.plotly_chart(fig_kal, width='stretch')
+        except ValueError:
+            st.info("Kalibrasyon eğrisi için test kümesindeki sınıf dağılımı bu dilim sayısına yetersiz.")
+
+        st.markdown("---")
+        st.markdown("#### 3️⃣ Maliyete Duyarlı Eşik: Kâr/Zarar Neresi Optimum?")
+        egitim_notu("""
+Eşik (Cut-off) Analizi sekmesi onay oranı ile bad rate arasındaki ödünleşimi *gösteriyordu*; burada
+bunu bir adım öteye taşıyıp gerçek TL cinsinden bir maliyet fonksiyonu kuruyoruz. İki hata türünün
+maliyeti farklıdır: **kaçırılan bir temerrüt** (kötü müşteriyi onaylamak) doğrudan anapara kaybıdır;
+**yanlışlıkla reddedilen iyi müşteri** ise sadece o kredinin faiz/kâr marjı kadar bir fırsat
+maliyetidir. Bu iki maliyeti girip test kümesi üzerinde toplam maliyeti en aza indiren eşiği
+buluyoruz — kurumsal risk politikasının arkasındaki gerçek optimizasyon budur.
+""", baslik="📚 Neden sadece bad rate değil, maliyet?")
+        c1, c2 = st.columns(2)
+        with c1:
+            fn_maliyet = st.number_input("Kaçırılan Temerrüdün Maliyeti (TL / vaka)", 100, 500000, 15000, step=500,
+                                          help="Kötü müşteriyi yanlışlıkla onaylamanın ortalama zararı (≈ EAD × LGD).")
+        with c2:
+            fp_maliyet = st.number_input("Yanlış Reddin Fırsat Maliyeti (TL / vaka)", 50, 100000, 2000, step=100,
+                                          help="İyi bir müşteriyi yanlışlıkla reddetmenin kaybettirdiği ortalama faiz/kâr marjı.")
+        esik_araligi_c = np.linspace(0.05, 0.95, 37)
+        toplam_maliyetler = []
+        for e in esik_araligi_c:
+            onaylanan_c = y_prob_kal <= e
+            kacirilan_temerrut = (y_test_kal[onaylanan_c] == 1).sum() if onaylanan_c.sum() > 0 else 0
+            yanlis_red = (y_test_kal[~onaylanan_c] == 0).sum() if (~onaylanan_c).sum() > 0 else 0
+            toplam_maliyetler.append(kacirilan_temerrut * fn_maliyet + yanlis_red * fp_maliyet)
+        en_iyi_index = int(np.argmin(toplam_maliyetler))
+        en_iyi_esik = esik_araligi_c[en_iyi_index]
+        fig_maliyet = go.Figure()
+        fig_maliyet.add_trace(go.Scatter(x=list(esik_araligi_c), y=toplam_maliyetler, mode='lines', name="Toplam Beklenen Maliyet (TL)",
+                                          line=dict(color="#0055a5", width=3)))
+        fig_maliyet.add_vline(x=en_iyi_esik, line_dash="dash", line_color="#c0392b",
+                               annotation_text=f"Optimum eşik ≈ {en_iyi_esik:.2f}")
+        fig_maliyet.update_layout(xaxis_title="Onay Eşiği (Cut-off)", yaxis_title="Test Kümesinde Toplam Maliyet (TL)")
+        st.plotly_chart(fig_maliyet, width='stretch')
+        st.metric("Girilen Maliyetlere Göre Optimum Onay Eşiği", f"{en_iyi_esik:.2f}")
+        st.caption("Not: bu, test kümesindeki gerçek/tahmin karşılaştırmasına dayanan basitleştirilmiş bir maliyet modelidir; "
+                    "gerçek bir bankada faiz geliri, tahsilat oranı ve zaman değeri de hesaba girer.")
+
+        st.markdown("---")
+        st.markdown("#### 4️⃣ Model Karşılaştırması: Lojistik Regresyon vs. Random Forest")
+        egitim_notu("""
+Lojistik regresyonu açıklanabilirlik için seçtim, ama bu seçimin bir bedeli olup olmadığını da
+göstermek gerekir. Aynı veriyle, aynı `class_weight='balanced'` mantığıyla bir Random Forest da
+eğitip AUC/F1'lerini yan yana koyuyorum. Fark küçükse (genelde kredi skorlama verisinde böyledir),
+açıklanabilirlikten neredeyse hiçbir performans bedeli ödemeden vazgeçmediğimi gösterir; fark
+büyükse, kurumun "yorumlanabilirlik mi, birkaç puanlık performans mı" trade-off'unu bilinçli
+yapması gerektiğini gösterir.
+""", baslik="📚 Neden yine de lojistik regresyon?")
+        karsilastirma_df = pd.DataFrame({
+            'Model': ['Lojistik Regresyon (kullanılan)', 'Random Forest (karşılaştırma)'],
+            'AUC': [sonuc['auc'], sonuc['rf_auc']],
+            'F1': [sonuc['f1'], sonuc['rf_f1']],
+            'Açıklanabilirlik': ['Yüksek (doğrudan katsayı)', 'Düşük (kara kutuya yakın)']
+        })
+        st.dataframe(karsilastirma_df, hide_index=True, width='stretch')
+        auc_farki = sonuc['rf_auc'] - sonuc['auc']
+        if auc_farki <= 0.02:
+            st.success(f"AUC farkı sadece {auc_farki:.3f} — açıklanabilirlikten pratikte performans bedeli ödemiyoruz.")
+        else:
+            st.warning(f"Random Forest AUC'de {auc_farki:.3f} daha yüksek — bu, gerçek bir kurumsal karar noktası olurdu.")
+
+        st.markdown("---")
+        st.markdown("#### 5️⃣ Model İzleme: Popülasyon Kayması (PSI)")
+        egitim_notu("""
+Bir model kurulduğu andaki veriyle iyi çalışsa da, zaman içinde başvuran kitlesi değişebilir
+(ekonomik koşullar, pazarlama kanalı, mevsimsellik). **PSI (Population Stability Index)**, modelin
+eğitildiği popülasyondaki skor dağılımı ile güncel popülasyondaki skor dağılımını karşılaştırır.
+Kural of thumb: PSI < 0.10 stabil, 0.10–0.25 hafif kayma (izle), > 0.25 önemli kayma (modeli
+gözden geçir/yeniden eğit). Burada eğitim kümesini "baseline", test kümesini "güncel popülasyon"
+olarak kullanıyorum — üretimde bu, "model kurulurken" ile "bugün" karşılaştırması olurdu.
+""", baslik="📚 PSI nedir, neden izlenir?")
+
+        def _psi_hesapla(baseline, guncel, dilim=10):
+            kesme = np.unique(np.quantile(baseline, np.linspace(0, 1, dilim + 1)))
+            if len(kesme) < 3:
+                return None, None
+            kesme[0], kesme[-1] = -np.inf, np.inf
+            b_sayim = np.histogram(baseline, bins=kesme)[0]
+            g_sayim = np.histogram(guncel, bins=kesme)[0]
+            b_oran = np.where(b_sayim == 0, 1e-4, b_sayim / b_sayim.sum())
+            g_oran = np.where(g_sayim == 0, 1e-4, g_sayim / g_sayim.sum())
+            katkilar = (g_oran - b_oran) * np.log(g_oran / b_oran)
+            tablo = pd.DataFrame({'Dilim': [f"Dilim {i+1}" for i in range(len(katkilar))],
+                                   'Baseline %': (b_oran * 100).round(1), 'Güncel %': (g_oran * 100).round(1),
+                                   'PSI Katkısı': katkilar.round(4)})
+            return katkilar.sum(), tablo
+
+        psi_degeri, psi_tablo = _psi_hesapla(sonuc['y_prob_train'], sonuc['y_prob_test'])
+        if psi_degeri is not None:
+            c1, c2 = st.columns([1, 2])
+            with c1:
+                st.metric("PSI Değeri", f"{psi_degeri:.3f}")
+                if psi_degeri < 0.10:
+                    st.success("Stabil — kayma yok.")
+                elif psi_degeri < 0.25:
+                    st.warning("Hafif kayma — izlemeye devam.")
+                else:
+                    st.error("Önemli kayma — model gözden geçirilmeli.")
+            with c2:
+                st.dataframe(psi_tablo, hide_index=True, width='stretch')
+        else:
+            st.info("PSI hesaplamak için yeterli veri dilimi oluşturulamadı.")
 
 def churn_sayfasi():
     st.header("Müşteri Kaybı (Churn) Erken Uyarı Sistemi")
