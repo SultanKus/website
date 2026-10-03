@@ -18,6 +18,7 @@ import requests
 import re
 from math import erf
 from scipy.optimize import minimize
+from temel_analiz import temel_analiz_sayfasi
 
 # ---------------------------------------------------------
 # SAYFA YAPILANDIRMASI VE CSS STİLİ
@@ -2957,7 +2958,7 @@ def veritabani_sayfasi():
     yonetici_sifresi = st.secrets.get("YONETICI_SIFRE", "")
     girilen_sifre = st.text_input("Yönetici Şifresi (Sadece sizin erişiminiz için)", type="password", key="admin_sifre_giris")
     
-    if yonetici_sifre and girilen_sifre == yonetici_sifresi:
+    if yonetici_sifresi and girilen_sifre == yonetici_sifresi:
         st.success("🔓 Yönetici yetkisi doğrulandı. Ziyaretçi ve sistem logları yükleniyor...")
 
         gonderen_kontrol = st.secrets.get("EMAIL_ADRES", "")
@@ -3044,47 +3045,42 @@ if _admin_kullanici_adi and st.session_state.get("aktif_kullanici") == _admin_ku
     _sistem_sayfalari.insert(0, st.Page(veritabani_sayfasi, title="Veritabanı Geçmişi", icon="📂"))
 
 pg = st.navigation({
-    "Genel Bakış & Canlı Piyasa": [
+    "📊 Piyasa & Analiz": [
         st.Page(ana_sayfa, title="Ana Sayfa", icon="🏠"),
-        st.Page(ml_rehberi_sayfasi, title="ML & Aktüerya Rehberi", icon="🎓"),
         st.Page(finansal_bilgi_sayfasi, title="Makroekonomi & Piyasalar", icon="🌍"),
         st.Page(veri_analizi_sayfasi, title="Canlı Hisse Korelasyon (EDA)", icon="📈"),
+        st.Page(temel_analiz_sayfasi, title="Temel Analiz (Mali Tablo)", icon="📑"),
+        st.Page(benchmark_sayfasi, title="Piyasa Kıyaslama", icon="📈"),
     ],
-    "✅ Doğrulanmış ML Modelleri": [
+    "🤖 ML Modelleri": [
+        st.Page(ml_rehberi_sayfasi, title="ML & Aktüerya Rehberi", icon="🎓"),
         st.Page(kasko_fiyatlama_sayfasi, title="Kasko Saf Prim (Poisson GLM)", icon="🚗"),
         st.Page(kredi_risk_sayfasi, title="Kredi Risk Skorlama", icon="🏦"),
         st.Page(churn_sayfasi, title="Churn Tahmini", icon="🚪"),
         st.Page(fraud_sayfasi, title="Fraud Uyarı Sistemi", icon="🕵️"),
+        st.Page(telematik_sayfasi, title="Telematik Risk Skorlama", icon="🚗"),
+        st.Page(clv_sayfasi, title="Müşteri Yaşam Değeri", icon="💎"),
     ],
-    "💹 Finansal Araçlar & Planlama": [
-        st.Page(markowitz_sayfasi, title="Markowitz Portföy Optimizasyonu", icon="🥧"),
-        st.Page(butce_raporlama_sayfasi, title="Bütçe vs. Gerçekleşen Analizi", icon="💰"),
-        st.Page(katilim_fon_sayfasi, title="Murabaha & Sukuk Araçları", icon="🕌"),
-    ],
-    "📐 Aktüeryal Yöntemler": [
+    "📐 Aktüerya & Risk": [
         st.Page(ibnr_sayfasi, title="IBNR Muallak Hasar", icon="📐"),
         st.Page(hayat_sigortasi_sayfasi, title="Hayat Sigortası Fiyatlama", icon="👨‍🦳"),
         st.Page(hasar_frekans_sayfasi, title="Hasar Frekans & Risk", icon="📉"),
         st.Page(monte_carlo_sayfasi, title="Monte Carlo Simülatörü", icon="🎲"),
-    ],
-    "🏛️ Risk & Sermaye Modelleri": [
         st.Page(solvency_sayfasi, title="Solvency II", icon="🏛️"),
-        st.Page(black_scholes_sayfasi, title="Black-Scholes", icon="📈"),
         st.Page(kredi_var_sayfasi, title="Kredi Portföyü VaR", icon="📉"),
         st.Page(reasurans_sayfasi, title="Dinamik Reasürans", icon="🌐"),
+        st.Page(stres_testi_sayfasi, title="Aktüeryal Stres Testi (Demo)", icon="⚡"),
     ],
-    "🧪 Kavramsal Vitrin (Demo)": [
-        st.Page(stres_testi_sayfasi, title="Aktüeryal Stres Testi", icon="⚡"),
-        st.Page(alm_nakit_sayfasi, title="ALM Nakit Eşitleme", icon="🔄"),
-        st.Page(alm_durasyon_sayfasi, title="ALM Durasyon", icon="⚖️"),
-    ],
-    "📈 Portföy & Müşteri Analitiği": [
+    "💹 Finansal Araçlar": [
+        st.Page(markowitz_sayfasi, title="Markowitz Portföy Optimizasyonu", icon="🥧"),
+        st.Page(black_scholes_sayfasi, title="Black-Scholes", icon="📈"),
+        st.Page(butce_raporlama_sayfasi, title="Bütçe vs. Gerçekleşen Analizi", icon="💰"),
+        st.Page(katilim_fon_sayfasi, title="Murabaha & Sukuk Araçları", icon="🕌"),
         st.Page(varlik_dagilimi_sayfasi, title="Varlık Dağılımı", icon="📊"),
-        st.Page(benchmark_sayfasi, title="Piyasa Kıyaslama", icon="📈"),
-        st.Page(telematik_sayfasi, title="Telematik Risk Skorlama", icon="🚗"),
-        st.Page(clv_sayfasi, title="Müşteri Yaşam Değeri", icon="💎"),
+        st.Page(alm_nakit_sayfasi, title="ALM Nakit Eşitleme (Demo)", icon="🔄"),
+        st.Page(alm_durasyon_sayfasi, title="ALM Durasyon (Demo)", icon="⚖️"),
     ],
-    "Sistem & İletişim": _sistem_sayfalari
-})
+    "👩‍💻 Hakkımda": _sistem_sayfalari,
+}, position="top")
 
 pg.run()
