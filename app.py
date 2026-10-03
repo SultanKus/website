@@ -34,9 +34,13 @@ st.markdown("""
 .block-container { color: #0b1f33 !important; }
 .block-container p, .block-container span, .block-container label, .block-container div, .block-container li { color: #0b1f33 !important; }
 .stApp { background-color: #f8f9fa; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; }
-header[data-testid="stHeader"] { background-color: #ffffff !important; }
-header[data-testid="stHeader"] * { color: #000000 !important; fill: #000000 !important; }
-[data-testid="collapsedControl"] svg, [data-testid="collapsedControl"] path, [data-testid="stSidebarCollapsedControl"] svg, button[kind="header"] svg { color: #000000 !important; fill: #000000 !important; }
+header[data-testid="stHeader"] { background: linear-gradient(90deg, #0b3d91 0%, #0077cc 55%, #00a6d6 100%) !important; box-shadow: 0 2px 10px rgba(0,60,120,0.25); }
+header[data-testid="stHeader"] * { color: #ffffff !important; }
+header[data-testid="stHeader"] a, header[data-testid="stHeader"] button { border-radius: 8px !important; font-weight: 600 !important; }
+header[data-testid="stHeader"] a:hover, header[data-testid="stHeader"] button:hover { background-color: rgba(255,255,255,0.18) !important; }
+[data-testid="stTopNavPopoverBody"], [data-testid="stTopNavPopoverBody"] * { color: #0b1f33 !important; }
+[data-testid="stSidebar"] input, [data-testid="stSidebar"] textarea { color: #0b1f33 !important; -webkit-text-fill-color: #0b1f33 !important; background-color: #ffffff !important; caret-color: #0b1f33 !important; }
+[data-testid="stSidebar"] input::placeholder, [data-testid="stSidebar"] textarea::placeholder { color: #6b7a8c !important; -webkit-text-fill-color: #6b7a8c !important; }
 [data-testid="stSidebar"] { background-color: #0b1f33; color: #ffffff; }
 [data-testid="stSidebar"] .stMarkdown h1, [data-testid="stSidebar"] .stMarkdown h2, [data-testid="stSidebar"] .stMarkdown h3, [data-testid="stSidebar"] span { color: #ffffff !important; }
 [data-testid="stSidebar"] * { color: #eef2f6 !important; }
@@ -3184,8 +3188,7 @@ def temel_analiz_sayfasi():
 
     st.subheader("Şirket Karşılaştırması (son dönem)")
     kars = pd.DataFrame(karsilastirma).set_index("Şirket")
-    st.dataframe(kars.style.format("{:.2f}", subset=[c for c in kars.columns if c != "Dönem"], na_rep="-"),
-                 width="stretch")
+    st.dataframe(kars.round(2), width="stretch")
 
     oran = st.selectbox("Grafikte karşılaştırılacak oran",
                         ["ROE (%)", "ROA (%)", "Net Marj (%)", "Cari Oran", "Borç / Özkaynak"], key="ta_oran")
@@ -3197,7 +3200,9 @@ def temel_analiz_sayfasi():
     for sekme, (s, (df, _)) in zip(sekmeler, sonuclar.items()):
         with sekme:
             st.markdown("**Yıllık kalemler ve oranlar** (tutarlar şirketin raporlama para biriminde)")
-            st.dataframe(df.sort_index(ascending=False).T.style.format("{:,.2f}", na_rep="-"), width="stretch")
+            detay = df.sort_index(ascending=False).T.round(2)
+            detay.columns = detay.columns.astype(str)
+            st.dataframe(detay, width="stretch")
             st.plotly_chart(px.line(df.reset_index(names="Yıl"), x="Yıl", y=["ROE (%)", "Net Marj (%)"],
                                     markers=True, title=f"{s}: ROE ve Net Marj"), width="stretch")
             st.markdown("**Veri doğrulama kontrolleri**")
