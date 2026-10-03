@@ -2954,10 +2954,10 @@ def veritabani_sayfasi():
             
     st.markdown("---")
     st.subheader("🕵️ Sistem Sahibi / Ziyaretçi Takip Paneli")
-    yonetici_sifresi = st.secrets.get("YONETICI_SIFRE", "sultan123")
+    yonetici_sifresi = st.secrets.get("YONETICI_SIFRE", "")
     girilen_sifre = st.text_input("Yönetici Şifresi (Sadece sizin erişiminiz için)", type="password", key="admin_sifre_giris")
     
-    if girilen_sifre == yonetici_sifresi:
+    if yonetici_sifre and girilen_sifre == yonetici_sifresi:
         st.success("🔓 Yönetici yetkisi doğrulandı. Ziyaretçi ve sistem logları yükleniyor...")
 
         gonderen_kontrol = st.secrets.get("EMAIL_ADRES", "")
